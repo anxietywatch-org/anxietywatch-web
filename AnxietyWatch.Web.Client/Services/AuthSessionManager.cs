@@ -24,6 +24,8 @@ public sealed class AuthSessionManager(
     ITokenStore tokenStore,
     JsonSerializerOptions jsonOptions) : IAuthSessionManager
 {
+    private static readonly TimeSpan SessionValidationTimeout = TimeSpan.FromSeconds(10);
+
     private Task<bool>? initializationTask;
     private Task<bool>? retryTask;
     private bool isValidated;
@@ -126,11 +128,18 @@ public sealed class AuthSessionManager(
 
         try
         {
-            return await RefreshSessionAsync() is not null;
+            using var timeout = new CancellationTokenSource(SessionValidationTimeout);
+            return await RefreshSessionAsync(timeout.Token) is not null;
         }
         catch (ApiException exception)
         {
             InitializationError = ApiErrorMessages.For(exception, "No pudimos validar tu sesión.");
+            isValidated = false;
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            InitializationError = "La validación de tu sesión tardó demasiado. Revisa tu conexión e inténtalo nuevamente.";
             isValidated = false;
             return false;
         }

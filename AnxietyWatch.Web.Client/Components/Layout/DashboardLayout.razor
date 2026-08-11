@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject IServiceProvider Services
 @inject NavigationManager Navigation
+@rendermode ClientRenderModes.WebAssembly
 @implements IDisposable
 
 @if (!string.IsNullOrWhiteSpace(sessionError))
@@ -198,7 +199,16 @@ else
         }
 
         SessionManager.SessionChanged += HandleSessionChanged;
-        await ApplySessionStateAsync(await SessionManager.InitializeAsync());
+        try
+        {
+            await ApplySessionStateAsync(await SessionManager.InitializeAsync());
+        }
+        catch
+        {
+            sessionError = "No pudimos restaurar tu sesión. Intenta iniciar sesión nuevamente.";
+            sessionReady = false;
+            StateHasChanged();
+        }
     }
 
     private async Task RetrySessionAsync()
@@ -209,6 +219,11 @@ else
         try
         {
             await ApplySessionStateAsync(await SessionManager.RetryInitializationAsync());
+        }
+        catch
+        {
+            sessionError = "No pudimos restaurar tu sesión. Intenta iniciar sesión nuevamente.";
+            sessionReady = false;
         }
         finally
         {

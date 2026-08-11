@@ -42,5 +42,4 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 
 var host = builder.Build();
-await host.Services.GetRequiredService<IAuthSessionManager>().InitializeAsync();
 await host.RunAsync();
