@@ -1,0 +1,44 @@
+name: Web CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: web-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore AnxietyWatch.Web.sln
+
+      - name: Build
+        run: dotnet build AnxietyWatch.Web.sln --configuration Release --no-restore
+
+      - name: Publish server app
+        run: dotnet publish AnxietyWatch.Web/AnxietyWatch.Web.csproj --configuration Release --no-build --output ./publish
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anxietywatch-web
+          path: ./publish
+          if-no-files-found: error
