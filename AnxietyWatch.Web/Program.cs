@@ -20,7 +20,8 @@ if (!app.Environment.IsDevelopment())
         .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     app.Use(async (context, next) =>
     {
-        if (!allowedHosts.Contains(context.Request.Host.Host, StringComparer.OrdinalIgnoreCase))
+        if (context.Request.Path != "/healthz" &&
+            !allowedHosts.Contains(context.Request.Host.Host, StringComparer.OrdinalIgnoreCase))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
@@ -71,6 +72,7 @@ app.Use(async (context, next) =>
 
 app.UseAntiforgery();
 
+app.MapGet("/healthz", () => Results.Ok(new { status = "healthy" }));
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
