@@ -16,7 +16,7 @@ var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
 {
-    var allowedHosts = (builder.Configuration["AllowedHosts"] ?? string.Empty)
+    var allowedHosts = (builder.Configuration["Security:AllowedHosts"] ?? string.Empty)
         .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     app.Use(async (context, next) =>
     {
