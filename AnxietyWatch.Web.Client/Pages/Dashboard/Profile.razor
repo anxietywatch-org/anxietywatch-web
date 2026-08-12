@@ -624,9 +624,9 @@ else
             if (await HandleUnauthorizedAsync(exception)) return;
             verificationError = true;
             verificationNotice = ApiErrorMessages.For(exception, "No pudimos reenviar la verificación.");
-            if (exception.StatusCode == 429)
+            if ((exception.StatusCode is 429 or 503) && exception.RetryAfterSeconds is > 0)
             {
-                StartVerificationCooldown(exception.RetryAfterSeconds ?? 60);
+                StartVerificationCooldown(exception.RetryAfterSeconds.Value);
             }
         }
         catch (OperationCanceledException) when (pageCancellation.IsCancellationRequested)
