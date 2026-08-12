@@ -21,17 +21,34 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.201'
 
       - name: Restore dependencies
         run: dotnet restore AnxietyWatch.Web.sln
 
+      - name: Audit dependencies
+        run: dotnet list AnxietyWatch.Web.sln package --vulnerable --include-transitive --no-restore
+
+      - name: Verify formatting
+        run: dotnet format AnxietyWatch.Web.sln --verify-no-changes --no-restore
+
       - name: Build
         run: dotnet build AnxietyWatch.Web.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test AnxietyWatch.Web.sln --configuration Release --no-build
+
+      - name: Scan repository secrets
+        uses: trufflesecurity/trufflehog@v3.90.8
+        with:
+          version: 3.90.8
+          extra_args: --results=verified,unknown
 
       - name: Publish server app
         run: dotnet publish AnxietyWatch.Web/AnxietyWatch.Web.csproj --configuration Release --no-build --output ./publish

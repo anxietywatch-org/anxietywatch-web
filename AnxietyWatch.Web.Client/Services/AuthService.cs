@@ -34,6 +34,7 @@ public class AuthService(
         try
         {
             using var response = await http.PostAsync("api/auth/logout", null);
+            response.EnsureSuccessStatusCode();
         }
         catch
         {

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace AnxietyWatch.Web.Client.Models.Api;
@@ -28,6 +29,9 @@ public sealed class CreateTokenRequest
 
 public sealed class ShareTokenRequest
 {
+    [Required]
+    [EmailAddress]
+    [StringLength(254)]
     [JsonPropertyName("recipientEmail")]
     public string RecipientEmail { get; init; } = string.Empty;
 }

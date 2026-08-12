@@ -285,6 +285,23 @@ FakesAssemblies/
 .ntvs_analysis.dat
 node_modules/
 
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+
+# Generic frontend/build output
+[Bb]uild/
+dist/
+
 # Visual Studio 6 build log
 *.plg
 

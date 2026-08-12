@@ -90,14 +90,13 @@
                                     <tr @key="token.Id">
                                         <td>@(index + 1)</td>
                                         <td>@GetRoleLabel(token.Role)</td>
-                                        <td><code>@token.Code</code></td>
+                                        <td><code>@MaskToken(token.Code)</code></td>
                                         <td>@token.ExpiresAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
                                         <td><span class="status-badge @GetStatusClass(token)">@GetStatusLabel(token)</span></td>
                                         <td>
                                             <div class="row-actions">
-                                                <button type="button" aria-label="Copiar token @token.Code" title="Copiar" @onclick="() => CopyTokenAsync(token.Code)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg></button>
-                                                <button type="button" aria-label="Compartir token @token.Code" title="@(IsExpired(token) ? "El token expiró" : "Compartir")" @onclick="() => OpenShareModal(token)" disabled="@(mutationInProgress || IsDeleted(token) || IsExpired(token))"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2" /><circle cx="6" cy="12" r="2" /><circle cx="18" cy="19" r="2" /><path d="m8 11 8-5m-8 7 8 5" /></svg></button>
-                                                <button type="button" aria-label="Eliminar token @token.Code" title="@(CanDelete(token) ? "Eliminar" : "Solo los tokens pendientes pueden eliminarse")" @onclick="() => DeleteTokenAsync(token)" disabled="@(mutationInProgress || !CanDelete(token))"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-10 4v5m4-5v5M8 7l1-3h6l1 3m2 0-1 13H7L6 7" /></svg></button>
+                                                <button type="button" aria-label="Compartir token" title="@(IsExpired(token) ? "El token expiró" : "Compartir")" @onclick="() => OpenShareModal(token)" disabled="@(mutationInProgress || IsDeleted(token) || IsExpired(token))"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2" /><circle cx="6" cy="12" r="2" /><circle cx="18" cy="19" r="2" /><path d="m8 11 8-5m-8 7 8 5" /></svg></button>
+                                                <button type="button" aria-label="Eliminar token" title="@(CanDelete(token) ? "Eliminar" : "Solo los tokens pendientes pueden eliminarse")" @onclick="() => DeleteTokenAsync(token)" disabled="@(mutationInProgress || !CanDelete(token))"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-10 4v5m4-5v5M8 7l1-3h6l1 3m2 0-1 13H7L6 7" /></svg></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -175,9 +174,9 @@
         <div class="token-modal-overlay" role="presentation" @onclick="CloseShareModal">
             <section class="token-modal share-modal" role="dialog" aria-modal="true" aria-labelledby="share-modal-title" @onclick:stopPropagation="true">
                 <header class="token-modal__header"><span class="token-modal__key" aria-hidden="true">@@</span><h2 id="share-modal-title">Compartir token</h2><button type="button" aria-label="Cerrar modal" @onclick="CloseShareModal" disabled="@isSharing">×</button></header>
-                <p class="share-modal__description">Envía <code>@shareToken.Code</code> por correo electrónico.</p>
+                <p class="share-modal__description">Envía el token seleccionado por correo electrónico.</p>
                 <label class="share-email-label" for="share-email">Correo del destinatario</label>
-                <input id="share-email" class="share-email-input" type="email" autocomplete="email" @bind="shareEmail" disabled="@isSharing" />
+                <input id="share-email" class="share-email-input" type="email" autocomplete="email" maxlength="254" @bind="shareEmail" disabled="@isSharing" />
                 @if (!string.IsNullOrWhiteSpace(shareMessage)) { <p class="modal-message @(shareSucceeded ? "modal-message--success" : null)" role="@(shareSucceeded ? "status" : "alert")">@shareMessage</p> }
                 <footer class="token-modal__actions"><button class="token-modal-button token-modal-button--cancel" type="button" @onclick="CloseShareModal" disabled="@isSharing">Cerrar</button><button class="token-modal-button token-modal-button--add" type="button" @onclick="ShareTokenAsync" disabled="@(isSharing || shareSucceeded)">@(isSharing ? "Enviando..." : "Enviar")</button></footer>
             </section>
@@ -333,7 +332,7 @@
             shareMessage = "Este token ya expiró y no se puede compartir.";
             return;
         }
-        if (!MailAddress.TryCreate(shareEmail.Trim(), out _))
+        if (shareEmail.Trim().Length > 254 || !MailAddress.TryCreate(shareEmail.Trim(), out _))
         {
             shareMessage = "Ingresa un correo electrónico válido.";
             shareSucceeded = false;
@@ -440,6 +439,7 @@
     private string GetTokenTypeClass(string role) => selectedRole == role ? "token-type-option is-selected" : "token-type-option";
     private static int GetPlanLimit(string? planId) => planId?.ToLowerInvariant() switch { "family" => 5, "professional" => 20, _ => 1 };
     private static string GetRoleLabel(string role) => role.ToLowerInvariant() switch { "self" => "App Móvil (yo)", "family_member" => "Miembro familiar", "patient" => "Paciente", _ => role };
+    private static string MaskToken(string code) => code.Length <= 4 ? "••••" : $"••••-{code[^4..]}";
     private static bool HasStatus(LinkTokenDto token, string status) =>
         string.Equals(token.Status, status, StringComparison.OrdinalIgnoreCase);
     private static bool IsDeleted(LinkTokenDto token) => HasStatus(token, "deleted");

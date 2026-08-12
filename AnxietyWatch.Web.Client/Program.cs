@@ -9,6 +9,13 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 var apiBaseUrl = builder.Configuration["Api:BaseUrl"]
     ?? throw new InvalidOperationException(
         "Configura 'Api:BaseUrl' en wwwroot/appsettings.json para consumir la API.");
+var apiBaseAddress = new Uri(apiBaseUrl, UriKind.Absolute);
+var officialApiOrigin = new Uri("https://api.mangoon.xyz/");
+if (apiBaseAddress.Scheme != Uri.UriSchemeHttps ||
+    Uri.Compare(apiBaseAddress, officialApiOrigin, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) != 0)
+{
+    throw new InvalidOperationException("'Api:BaseUrl' debe utilizar el origen oficial HTTPS de AnxietyWatch.");
+}
 
 // camelCase al serializar/deserializar, acorde al contrato JSON de la API.
 JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
@@ -18,13 +25,13 @@ builder.Services.AddSingleton(jsonOptions);
 builder.Services.AddScoped<ITokenStore, TokenStore>();
 
 builder.Services.AddScoped(sp => new HttpClient(
-        new AuthHandler(sp.GetRequiredService<ITokenStore>())
+        new AuthHandler(sp.GetRequiredService<ITokenStore>(), apiBaseAddress)
         {
             InnerHandler = new HttpClientHandler()
         })
-    {
-        BaseAddress = new Uri(apiBaseUrl)
-    });
+{
+    BaseAddress = apiBaseAddress
+});
 
 // Estado de autenticación para que la UI reaccione a login/logout.
 builder.Services.AddAuthorizationCore();

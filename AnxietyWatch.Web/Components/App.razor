@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -8,7 +9,7 @@
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["AnxietyWatch.Web.styles.css"]" />
-    <ImportMap />
+    <ImportMap nonce="@CspNonce" />
     <HeadOutlet />
 </head>
 
@@ -19,3 +20,7 @@
 </body>
 
 </html>
+
+@code {
+    private string CspNonce => HttpContextAccessor.HttpContext?.Items["CspNonce"]?.ToString() ?? string.Empty;
+}

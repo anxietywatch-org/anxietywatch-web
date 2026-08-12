@@ -198,6 +198,11 @@
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            if (symptoms.Length > 10 || symptoms.Any(symptom => symptom.Length > 60))
+            {
+                createError = "Ingresa hasta 10 síntomas de máximo 60 caracteres cada uno.";
+                return;
+            }
             var request = new CreateEpisodeRequest
             {
                 Intensity = form.Intensity,
