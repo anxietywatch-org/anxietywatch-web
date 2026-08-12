@@ -471,9 +471,11 @@
     {
         [Required(ErrorMessage = "El correo es obligatorio.")]
         [EmailAddress(ErrorMessage = "Introduce un correo electrónico válido.")]
+        [StringLength(254, ErrorMessage = "El correo no puede superar los 254 caracteres.")]
         public string Email { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "La contraseña es obligatoria.")]
+        [StringLength(64, ErrorMessage = "La contraseña no puede superar los 64 caracteres.")]
         public string Password { get; set; } = string.Empty;
     }
 
@@ -485,6 +487,7 @@
 
         [Required(ErrorMessage = "El correo es obligatorio.")]
         [EmailAddress(ErrorMessage = "Introduce un correo electrónico válido.")]
+        [StringLength(254, ErrorMessage = "El correo no puede superar los 254 caracteres.")]
         public string Email { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "La contraseña es obligatoria.")]

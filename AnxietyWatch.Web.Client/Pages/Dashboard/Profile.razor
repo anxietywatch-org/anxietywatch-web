@@ -44,7 +44,7 @@ else
             <section class="profile-card" aria-labelledby="general-information-title">
                 <div class="profile-card__heading profile-card__heading--identity">
                     <div class="profile-avatar-wrap">
-                        @if (!string.IsNullOrWhiteSpace(profileModel.AvatarUrl))
+                        @if (IsSafeAvatarUrl(profileModel.AvatarUrl))
                         {
                             <img class="profile-avatar profile-avatar--image" src="@profileModel.AvatarUrl" alt="Avatar de @profileModel.FullName" />
                         }
@@ -405,6 +405,13 @@ else
     private async Task SaveProfileAsync()
     {
         if (!profileSettingsLoaded || isLoadingProfileSettings || profilePending) return;
+        if (!string.IsNullOrWhiteSpace(profileModel.AvatarUrl) &&
+            (!Uri.TryCreate(profileModel.AvatarUrl, UriKind.Absolute, out var avatarUri) || avatarUri.Scheme != Uri.UriSchemeHttps))
+        {
+            profileError = true;
+            profileNotice = "La URL del avatar debe utilizar HTTPS.";
+            return;
+        }
 
         profilePending = true;
         profileNotice = null;
@@ -689,6 +696,9 @@ else
 
     private static string NoticeClass(bool isError) => isError ? "inline-notice inline-notice--error" : "inline-notice";
 
+    private static bool IsSafeAvatarUrl(string? avatarUrl) =>
+        Uri.TryCreate(avatarUrl, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
+
     private static RenderFragment PasswordVisibilityIcon(bool visible) => builder =>
     {
         if (visible)
@@ -704,9 +714,11 @@ else
     public sealed class ProfileModel
     {
         [Required(ErrorMessage = "El nombre completo es obligatorio.")]
+        [StringLength(60, MinimumLength = 2, ErrorMessage = "El nombre debe tener entre 2 y 60 caracteres.")]
         public string FullName { get; set; } = string.Empty;
 
         [Url(ErrorMessage = "Introduce una URL válida para el avatar.")]
+        [StringLength(2048, ErrorMessage = "La URL del avatar es demasiado larga.")]
         public string? AvatarUrl { get; set; }
     }
 
@@ -721,6 +733,7 @@ else
     public sealed class PasswordModel
     {
         [Required(ErrorMessage = "La contraseña actual es obligatoria.")]
+        [StringLength(64, ErrorMessage = "La contraseña actual no puede superar los 64 caracteres.")]
         public string CurrentPassword { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "La nueva contraseña es obligatoria.")]

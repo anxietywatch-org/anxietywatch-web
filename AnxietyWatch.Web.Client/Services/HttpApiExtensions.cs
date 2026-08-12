@@ -14,8 +14,10 @@ public static class HttpApiExtensions
     public static async Task<ApiResult<T>> ReadApiResultAsync<T>(
         this HttpResponseMessage response,
         JsonSerializerOptions? options = null,
-        CancellationToken cancellationToken = default) {
-        if (response.IsSuccessStatusCode) {
+        CancellationToken cancellationToken = default)
+    {
+        if (response.IsSuccessStatusCode)
+        {
             var data = await response.Content
                 .ReadFromJsonAsync<T>(options, cancellationToken);
             return ApiResult<T>.Success(data!);
@@ -34,8 +36,10 @@ public static class HttpApiExtensions
     public static async Task<T> ReadApiAsync<T>(
         this HttpResponseMessage response,
         JsonSerializerOptions? options = null,
-        CancellationToken cancellationToken = default) {
-        if (response.IsSuccessStatusCode) {
+        CancellationToken cancellationToken = default)
+    {
+        if (response.IsSuccessStatusCode)
+        {
             return await response.Content
                        .ReadFromJsonAsync<T>(options, cancellationToken)
                    ?? throw new ApiException(
@@ -59,13 +63,16 @@ public static class HttpApiExtensions
     private static async Task<ApiProblemDetails> ReadProblemAsync(
         HttpResponseMessage response,
         JsonSerializerOptions? options,
-        CancellationToken cancellationToken) {
-        try {
+        CancellationToken cancellationToken)
+    {
+        try
+        {
             return await response.Content
                        .ReadFromJsonAsync<ApiProblemDetails>(options, cancellationToken)
                    ?? CreateFallbackProblem(response);
         }
-        catch (JsonException) {
+        catch (JsonException)
+        {
             return CreateFallbackProblem(response);
         }
     }

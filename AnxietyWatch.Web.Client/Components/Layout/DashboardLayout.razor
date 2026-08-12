@@ -93,7 +93,7 @@ else
 
                 <details class="user-menu">
                     <summary class="user-profile" aria-label="Abrir menú del perfil de @(CurrentUser!.FullName)">
-                        @if (!string.IsNullOrWhiteSpace(CurrentUser.AvatarUrl))
+                        @if (IsSafeAvatarUrl(CurrentUser.AvatarUrl))
                         {
                             <img class="user-avatar user-avatar--image" src="@CurrentUser.AvatarUrl" alt="" />
                         }
@@ -112,7 +112,7 @@ else
 
                     <div class="profile-dropdown">
                         <header class="profile-dropdown__header">
-                            @if (!string.IsNullOrWhiteSpace(CurrentUser.AvatarUrl))
+                            @if (IsSafeAvatarUrl(CurrentUser.AvatarUrl))
                             {
                                 <img class="user-avatar user-avatar--large user-avatar--image" src="@CurrentUser.AvatarUrl" alt="" />
                             }
@@ -289,6 +289,9 @@ else
             _ => string.Concat(parts[0][0], parts[^1][0]).ToUpperInvariant()
         };
     }
+
+    private static bool IsSafeAvatarUrl(string? avatarUrl) =>
+        Uri.TryCreate(avatarUrl, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
 
     public void Dispose()
     {
