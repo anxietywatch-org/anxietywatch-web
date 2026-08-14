@@ -5,16 +5,15 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// Url base de la API backend (override con appsettings.json o Api:BaseUrl).
+// La API se consume a través del mismo origen del frontend. El servidor web
+// reenvía /api al backend HTTPS, evitando bloqueos cross-origin en clientes.
 var apiBaseUrl = builder.Configuration["Api:BaseUrl"]
     ?? throw new InvalidOperationException(
         "Configura 'Api:BaseUrl' en wwwroot/appsettings.json para consumir la API.");
 var apiBaseAddress = new Uri(apiBaseUrl, UriKind.Absolute);
-var officialApiOrigin = new Uri("https://api.mangoon.xyz/");
-if (apiBaseAddress.Scheme != Uri.UriSchemeHttps ||
-    Uri.Compare(apiBaseAddress, officialApiOrigin, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) != 0)
+if (!apiBaseAddress.IsAbsoluteUri || apiBaseAddress.AbsolutePath != "/")
 {
-    throw new InvalidOperationException("'Api:BaseUrl' debe utilizar el origen oficial HTTPS de AnxietyWatch.");
+    throw new InvalidOperationException("'Api:BaseUrl' debe ser el origen del frontend, por ejemplo https://mangoon.xyz/.");
 }
 
 // camelCase al serializar/deserializar, acorde al contrato JSON de la API.
