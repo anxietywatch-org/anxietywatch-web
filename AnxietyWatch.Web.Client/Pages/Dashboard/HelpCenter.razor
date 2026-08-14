@@ -4,6 +4,9 @@
 @using AnxietyWatch.Web.Client.Models.Api
 @layout DashboardLayout
 @inject IContentService ContentService
+@inject ISupportService SupportService
+@inject IAuthSessionManager SessionManager
+@inject NavigationManager Navigation
 @implements IDisposable
 
 <PageTitle>Centro de ayuda | AnxietyWatch</PageTitle>
@@ -112,9 +115,13 @@
                     </div>
                 </header>
 
-                <div class="auth-alert" role="status">El backend aún no ofrece un endpoint para tickets. Ninguna solicitud se enviará desde este formulario.</div>
+                @if (!string.IsNullOrWhiteSpace(ticketMessage))
+                {
+                    <div class="@(ticketMessageIsError ? "auth-alert" : "ticket-success")"
+                         role="@(ticketMessageIsError ? "alert" : "status")">@ticketMessage</div>
+                }
 
-                <EditForm Model="ticketModel" class="ticket-form">
+                <EditForm Model="ticketModel" OnValidSubmit="SubmitTicketAsync" class="ticket-form">
                     <DataAnnotationsValidator />
 
                     <div class="ticket-field">
@@ -122,6 +129,7 @@
                         <InputText id="ticket-subject"
                                    class="form-input"
                                    placeholder="Describe brevemente tu problema"
+                                   disabled="@isSubmittingTicket"
                                    @bind-Value="ticketModel.Subject" />
                         <ValidationMessage For="@(() => ticketModel.Subject)" />
                     </div>
@@ -129,20 +137,20 @@
                     <div class="ticket-form__row">
                         <div class="ticket-field">
                             <label for="ticket-category">Categoría</label>
-                            <InputSelect id="ticket-category" class="form-input" @bind-Value="ticketModel.Category">
-                                <option value="General">General</option>
-                                <option value="Tokens">Tokens</option>
-                                <option value="Facturación">Facturación</option>
-                                <option value="Error Técnico">Error Técnico</option>
+                            <InputSelect id="ticket-category" class="form-input" disabled="@isSubmittingTicket" @bind-Value="ticketModel.Category">
+                                <option value="general">General</option>
+                                <option value="tokens">Tokens</option>
+                                <option value="billing">Facturación</option>
+                                <option value="technical">Error Técnico</option>
                             </InputSelect>
                         </div>
 
                         <div class="ticket-field">
                             <label for="ticket-priority">Prioridad</label>
-                            <InputSelect id="ticket-priority" class="form-input" @bind-Value="ticketModel.Priority">
-                                <option value="Baja">Baja</option>
-                                <option value="Normal">Normal</option>
-                                <option value="Alta">Alta</option>
+                            <InputSelect id="ticket-priority" class="form-input" disabled="@isSubmittingTicket" @bind-Value="ticketModel.Priority">
+                                <option value="low">Baja</option>
+                                <option value="normal">Normal</option>
+                                <option value="high">Alta</option>
                             </InputSelect>
                         </div>
                     </div>
@@ -153,16 +161,17 @@
                                        class="form-input ticket-message"
                                        rows="4"
                                        placeholder="Describe el problema con el mayor detalle posible..."
+                                       disabled="@isSubmittingTicket"
                                        @bind-Value="ticketModel.Message" />
                         <ValidationMessage For="@(() => ticketModel.Message)" />
                     </div>
 
-                    <button class="ticket-submit" type="button" disabled aria-disabled="true">
+                    <button class="ticket-submit" type="submit" disabled="@isSubmittingTicket" aria-disabled="@isSubmittingTicket">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="m3 11 18-8-8 18-2-8-8-2Z" />
                             <path d="m11 13 5-5" />
                         </svg>
-                        Próximamente
+                        @(isSubmittingTicket ? "Enviando..." : "Enviar ticket")
                     </button>
                 </EditForm>
             </section>
@@ -178,6 +187,9 @@
     private int? openFaqId;
     private bool isLoading = true;
     private string? errorMessage;
+    private bool isSubmittingTicket;
+    private string? ticketMessage;
+    private bool ticketMessageIsError;
 
     private IReadOnlyList<FaqView> filteredFaqs => faqs
         .Select((faq, index) => new FaqView(index, faq.Question, faq.Answer))
@@ -218,18 +230,62 @@
 
     private void ToggleFaq(int faqId) => openFaqId = openFaqId == faqId ? null : faqId;
 
+    private async Task SubmitTicketAsync()
+    {
+        if (isSubmittingTicket) return;
+        isSubmittingTicket = true;
+        ticketMessage = null;
+        ticketMessageIsError = false;
+        try
+        {
+            var created = await SupportService.CreateTicketAsync(
+                new CreateSupportTicketRequest(
+                    ticketModel.Subject,
+                    ticketModel.Category,
+                    ticketModel.Priority,
+                    ticketModel.Message),
+                cancellationTokenSource.Token);
+            ticketMessage = $"Ticket enviado correctamente. Folio: {created.Id:D}.";
+            ticketModel = new TicketModel();
+        }
+        catch (ApiException exception) when (exception.StatusCode == 401)
+        {
+            await SessionManager.ClearAsync();
+            Navigation.NavigateTo("/login", replace: true);
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        catch (ApiException exception)
+        {
+            ticketMessageIsError = true;
+            ticketMessage = ApiErrorMessages.For(exception, "No pudimos enviar el ticket.");
+        }
+        catch (Exception)
+        {
+            ticketMessageIsError = true;
+            ticketMessage = "No pudimos enviar el ticket. Inténtalo nuevamente.";
+        }
+        finally
+        {
+            isSubmittingTicket = false;
+        }
+    }
+
     private sealed record FaqView(int Id, string Question, string Answer);
 
     public sealed class TicketModel
     {
         [Required(ErrorMessage = "El asunto es obligatorio.")]
+        [StringLength(120, MinimumLength = 3, ErrorMessage = "El asunto debe tener entre 3 y 120 caracteres.")]
         public string Subject { get; set; } = string.Empty;
 
-        public string Category { get; set; } = "General";
+        public string Category { get; set; } = "general";
 
-        public string Priority { get; set; } = "Normal";
+        public string Priority { get; set; } = "normal";
 
         [Required(ErrorMessage = "El mensaje es obligatorio.")]
+        [StringLength(4000, MinimumLength = 10, ErrorMessage = "El mensaje debe tener entre 10 y 4000 caracteres.")]
         public string Message { get; set; } = string.Empty;
     }
 

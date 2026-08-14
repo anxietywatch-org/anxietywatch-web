@@ -1,0 +1,98 @@
+@page "/verify-email"
+@rendermode ClientRenderModes.WebAssembly
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Verificar correo | AnxietyWatch</PageTitle>
+
+<section class="verify-email-shell" aria-labelledby="verify-email-title">
+    <div class="verify-email-card">
+        <header class="verify-email-header">
+            <span class="verify-email-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>
+            </span>
+            <h1 id="verify-email-title">Verificación de correo</h1>
+            <p>@statusMessage</p>
+        </header>
+
+        @if (isVerifying)
+        {
+            <div class="verify-email-status" role="status">Confirmando tu correo...</div>
+        }
+        else if (isVerified)
+        {
+            <div class="verify-email-success" role="status">Correo verificado correctamente.</div>
+            <a class="verify-email-action" href="/login">Iniciar sesión</a>
+        }
+        else
+        {
+            <div class="verify-email-error" role="alert">@errorMessage</div>
+            <a class="verify-email-action" href="/login">Volver al inicio de sesión</a>
+        }
+    </div>
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "token")]
+    public string? QueryToken { get; set; }
+
+    private bool isVerifying = true;
+    private bool isVerified;
+    private string statusMessage = "Estamos confirmando el enlace que recibiste por correo.";
+    private string errorMessage = "El enlace de verificación no contiene un token válido.";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var token = QueryToken;
+        try
+        {
+            token = await JS.InvokeAsync<string>("anxietyWatch.emailVerification.consumeToken");
+        }
+        catch (JSException)
+        {
+            if (!string.IsNullOrWhiteSpace(QueryToken))
+            {
+                Navigation.NavigateTo("/verify-email", replace: true);
+            }
+        }
+
+        await VerifyAsync(token);
+    }
+
+    private async Task VerifyAsync(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            isVerifying = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            await AuthService.ConfirmEmailVerificationAsync(new EmailVerificationConfirmRequest { Token = token });
+            isVerified = true;
+            statusMessage = "Tu cuenta ya puede usar las funciones disponibles para correos verificados.";
+        }
+        catch (ApiException exception) when (exception.StatusCode == 410)
+        {
+            errorMessage = "El enlace de verificación expiró o ya fue utilizado. Solicita uno nuevo desde tu cuenta.";
+        }
+        catch (ApiException exception)
+        {
+            errorMessage = ApiErrorMessages.For(exception, "No pudimos verificar tu correo.");
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "No pudimos conectar con el servicio. Inténtalo nuevamente.";
+        }
+        finally
+        {
+            isVerifying = false;
+            StateHasChanged();
+        }
+    }
+}
