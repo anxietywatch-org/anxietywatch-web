@@ -18,7 +18,7 @@ La API se configura en `AnxietyWatch.Web.Client/wwwroot/appsettings.json`.
 ```json
 {
   "Api": {
-    "BaseUrl": "https://api.mangoon.xyz/"
+    "BaseUrl": "https://mangoon.xyz/"
   }
 }
 ```
@@ -49,7 +49,12 @@ Dominio frontend:
 https://mangoon.xyz
 ```
 
-API permitida por CORS:
+La aplicación reenvía las solicitudes de navegador de `/api/*` al backend
+oficial `https://api.mangoon.xyz`. Esto mantiene las llamadas de la interfaz
+en el mismo origen y evita que extensiones o políticas del navegador bloqueen
+las solicitudes cross-origin.
+
+API de servicio:
 
 ```text
 https://api.mangoon.xyz
