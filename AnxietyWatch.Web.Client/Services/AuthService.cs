@@ -61,6 +61,12 @@ public class AuthService(
         return await response.ReadApiAsync<AuthMessageResponse>(jsonOptions);
     }
 
+    public async Task<AuthMessageResponse> ConfirmEmailVerificationAsync(EmailVerificationConfirmRequest request, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.PostAsJsonAsync("api/auth/verify-email/confirm", request, jsonOptions, cancellationToken);
+        return await response.ReadApiAsync<AuthMessageResponse>(jsonOptions, cancellationToken);
+    }
+
     public async Task<EmailVerificationStatusResponse> GetEmailVerificationStatusAsync(CancellationToken cancellationToken = default)
     {
         using var response = await http.GetAsync("api/auth/verify-email/status", cancellationToken);

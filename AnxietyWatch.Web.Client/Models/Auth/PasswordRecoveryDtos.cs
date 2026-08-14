@@ -31,6 +31,14 @@ public sealed class AuthMessageResponse
     public string Message { get; set; } = string.Empty;
 }
 
+public sealed class EmailVerificationConfirmRequest
+{
+    [Required(ErrorMessage = "El token de verificación es obligatorio.")]
+    [StringLength(2048, ErrorMessage = "El token de verificación es demasiado largo.")]
+    [JsonPropertyName("token")]
+    public string Token { get; set; } = string.Empty;
+}
+
 public sealed class EmailVerificationStatusResponse
 {
     [JsonPropertyName("emailVerified")]

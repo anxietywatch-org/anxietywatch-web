@@ -15,10 +15,12 @@ public class AuthHandler : DelegatingHandler
         "api/tokens",
         "api/profile",
         "api/settings",
+        "api/support",
         "api/auth/session",
         "api/auth/logout",
         "api/auth/change-password",
-        "api/auth/verify-email"
+        "api/auth/verify-email/status",
+        "api/auth/verify-email/resend"
     ];
 
     private readonly ITokenStore _tokenStore;
