@@ -13,15 +13,9 @@ dotnet restore AnxietyWatch.Web.sln
 dotnet run --project AnxietyWatch.Web/AnxietyWatch.Web.csproj
 ```
 
-La API se configura en `AnxietyWatch.Web.Client/wwwroot/appsettings.json`.
-
-```json
-{
-  "Api": {
-    "BaseUrl": "https://mangoon.xyz/"
-  }
-}
-```
+El cliente consume `/api/*` desde el mismo origen en el que se ejecuta. El
+servidor web reenvía esas solicitudes al backend, por lo que localhost y los
+entornos de preview funcionan sin cambiar una URL dentro del WebAssembly.
 
 ## CI
 
@@ -68,3 +62,10 @@ curl.exe -fsS https://api.mangoon.xyz/api/plans
 ```
 
 Luego crear un usuario temporal desde la UI y confirmar que el dashboard ya no queda detenido en `Restaurando tu sesión...`.
+
+## Contenedor
+
+El `Dockerfile` publica el servidor ASP.NET Core en el puerto `8080` y permite
+desplegar la misma imagen en Koyeb, Render u otra plataforma compatible con
+contenedores. La plataforma debe comprobar `/healthz` y configurar
+`Security__AllowedHosts` con sus dominios públicos separados por punto y coma.
