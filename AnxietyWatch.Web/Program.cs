@@ -74,6 +74,10 @@ app.Use(async (context, next) =>
     await next();
 });
 
+// MapStaticAssets aporta fingerprinting y compresión. UseStaticFiles mantiene
+// disponibles las rutas lógicas de arranque de Blazor (por ejemplo,
+// _framework/blazor.web.js) en imágenes publicadas por proveedores Docker.
+app.UseStaticFiles();
 app.UseAntiforgery();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "healthy" }));
