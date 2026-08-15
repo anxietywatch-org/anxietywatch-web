@@ -5,16 +5,11 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// La API se consume a través del mismo origen del frontend. El servidor web
-// reenvía /api al backend HTTPS, evitando bloqueos cross-origin en clientes.
-var apiBaseUrl = builder.Configuration["Api:BaseUrl"]
-    ?? throw new InvalidOperationException(
-        "Configura 'Api:BaseUrl' en wwwroot/appsettings.json para consumir la API.");
-var apiBaseAddress = new Uri(apiBaseUrl, UriKind.Absolute);
-if (!apiBaseAddress.IsAbsoluteUri || apiBaseAddress.AbsolutePath != "/")
-{
-    throw new InvalidOperationException("'Api:BaseUrl' debe ser el origen del frontend, por ejemplo https://mangoon.xyz/.");
-}
+// La API se consume siempre a través del mismo origen desde el que se cargó
+// el frontend. El servidor web reenvía /api al backend HTTPS. Derivar la URL
+// del host evita que una configuración de producción rompa localhost o un
+// dominio de preview y mantiene las solicitudes dentro de la CSP same-origin.
+var apiBaseAddress = new Uri(builder.HostEnvironment.BaseAddress, UriKind.Absolute);
 
 // camelCase al serializar/deserializar, acorde al contrato JSON de la API.
 JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);

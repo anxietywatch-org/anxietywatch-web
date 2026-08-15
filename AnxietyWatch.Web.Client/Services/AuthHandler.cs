@@ -37,12 +37,17 @@ public class AuthHandler : DelegatingHandler
         CancellationToken cancellationToken)
     {
         var requestUri = request.RequestUri;
+        var absoluteRequestUri = requestUri switch
+        {
+            null => null,
+            { IsAbsoluteUri: true } => requestUri,
+            _ => new Uri(_apiBaseAddress, requestUri)
+        };
         var token = _tokenStore.GetAccessToken();
         var expiresAt = _tokenStore.GetExpiresAt();
-        if (requestUri is not null &&
-            requestUri.Scheme == Uri.UriSchemeHttps &&
-            _apiBaseAddress.IsBaseOf(requestUri) &&
-            IsProtectedPath(Uri.UnescapeDataString(_apiBaseAddress.MakeRelativeUri(requestUri).GetComponents(UriComponents.Path, UriFormat.Unescaped))) &&
+        if (absoluteRequestUri is not null &&
+            _apiBaseAddress.IsBaseOf(absoluteRequestUri) &&
+            IsProtectedPath(Uri.UnescapeDataString(absoluteRequestUri.AbsolutePath.TrimStart('/'))) &&
             !string.IsNullOrWhiteSpace(token) &&
             expiresAt > DateTimeOffset.UtcNow)
         {
