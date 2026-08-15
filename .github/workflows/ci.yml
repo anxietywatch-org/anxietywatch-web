@@ -53,6 +53,28 @@ jobs:
       - name: Publish server app
         run: dotnet publish AnxietyWatch.Web/AnxietyWatch.Web.csproj --configuration Release --no-build --output ./publish
 
+      - name: Smoke test published app
+        shell: bash
+        run: |
+          (
+            cd publish
+            dotnet AnxietyWatch.Web.dll --urls http://127.0.0.1:5080
+          ) > /tmp/anxietywatch-web.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid"' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:5080/healthz > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:5080/healthz > /dev/null
+          curl --fail --silent http://127.0.0.1:5080/_framework/blazor.web.js > /dev/null
+          curl --fail --silent --max-time 20 http://127.0.0.1:5080/api/plans > /dev/null
+
+      - name: Build Docker image
+        run: docker build --tag anxietywatch-web:ci .
+
       - name: Upload publish artifact
         uses: actions/upload-artifact@v4
         with:

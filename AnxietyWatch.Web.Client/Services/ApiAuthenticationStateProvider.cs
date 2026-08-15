@@ -8,7 +8,7 @@ namespace AnxietyWatch.Web.Client.Services;
 /// Proveedor de estado que actualiza la identidad de la UI según la sesión
 /// guardada en <see cref="ITokenStore"/> (activa/cerrada).
 /// </summary>
-public class ApiAuthenticationStateProvider : AuthenticationStateProvider
+public class ApiAuthenticationStateProvider : AuthenticationStateProvider, IDisposable
 {
     private readonly IAuthSessionManager _sessionManager;
 
@@ -41,4 +41,6 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
     /// <summary>Notifica a la UI que el estado de sesión cambió (login/logout).</summary>
     public void NotifyAuthenticationStateChanged() =>
         base.NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+
+    public void Dispose() => _sessionManager.SessionChanged -= NotifyAuthenticationStateChanged;
 }
