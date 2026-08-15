@@ -26,6 +26,7 @@ public sealed class AuthSessionManager(
 {
     private static readonly TimeSpan SessionValidationTimeout = TimeSpan.FromSeconds(10);
 
+    private readonly object stateGate = new();
     private Task<bool>? initializationTask;
     private Task<bool>? retryTask;
     private bool isValidated;
@@ -39,7 +40,13 @@ public sealed class AuthSessionManager(
     public string? InitializationError { get; private set; }
     public event Action? SessionChanged;
 
-    public Task<bool> InitializeAsync() => initializationTask ??= InitializeCoreAsync();
+    public Task<bool> InitializeAsync()
+    {
+        lock (stateGate)
+        {
+            return initializationTask ??= InitializeCoreAsync();
+        }
+    }
 
     public Task<bool> RetryInitializationAsync()
     {
@@ -54,8 +61,11 @@ public sealed class AuthSessionManager(
 
     private async Task<bool> RetryCoreAsync()
     {
-        initializationTask = null;
-        InitializationError = null;
+        lock (stateGate)
+        {
+            initializationTask = null;
+            InitializationError = null;
+        }
         try
         {
             return await InitializeAsync();
@@ -82,19 +92,32 @@ public sealed class AuthSessionManager(
 
     public async Task SetSessionAsync(AuthResponse session)
     {
+        if (string.IsNullOrWhiteSpace(session.Token) ||
+            session.ExpiresAt <= DateTimeOffset.UtcNow ||
+            session.User is null)
+        {
+            throw new InvalidOperationException("La respuesta de autenticación no contiene una sesión válida.");
+        }
+
         await tokenStore.StoreAsync(session);
-        isValidated = true;
-        InitializationError = null;
-        initializationTask = Task.FromResult(true);
+        lock (stateGate)
+        {
+            isValidated = true;
+            InitializationError = null;
+            initializationTask = Task.FromResult(true);
+        }
         SessionChanged?.Invoke();
     }
 
     public async Task ClearAsync()
     {
         await tokenStore.ClearAsync();
-        isValidated = false;
-        InitializationError = null;
-        initializationTask = Task.FromResult(false);
+        lock (stateGate)
+        {
+            isValidated = false;
+            InitializationError = null;
+            initializationTask = Task.FromResult(false);
+        }
         SessionChanged?.Invoke();
     }
 
@@ -146,6 +169,12 @@ public sealed class AuthSessionManager(
         catch (HttpRequestException)
         {
             InitializationError = "No pudimos conectar con el servicio para validar tu sesión.";
+            isValidated = false;
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            InitializationError = "El servicio devolvió una sesión inválida. Intenta iniciar sesión nuevamente.";
             isValidated = false;
             return false;
         }

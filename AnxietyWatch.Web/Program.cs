@@ -4,13 +4,49 @@ using Microsoft.AspNetCore.Http.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var apiBaseUrl = builder.Configuration["Api:BaseUrl"] ?? "https://api.mangoon.xyz/";
+if (!Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out var apiBaseUri) ||
+    apiBaseUri.Scheme != Uri.UriSchemeHttps)
+{
+    throw new InvalidOperationException("Api:BaseUrl debe ser una URL HTTPS absoluta.");
+}
+
+var forwardedRequestHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+{
+    "Accept",
+    "Accept-Language",
+    "Authorization",
+    "If-Match",
+    "If-None-Match",
+    "Range"
+};
+
+var forwardedResponseHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+{
+    "Cache-Control",
+    "Content-Disposition",
+    "Content-Encoding",
+    "Content-Language",
+    "Content-Location",
+    "Content-Range",
+    "Content-Type",
+    "ETag",
+    "Expires",
+    "Last-Modified",
+    "Location",
+    "Retry-After",
+    "Vary",
+    "WWW-Authenticate"
+};
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient("AnxietyWatchApi", client =>
 {
-    client.BaseAddress = new Uri("https://api.mangoon.xyz/");
+    client.BaseAddress = apiBaseUri;
+    client.Timeout = TimeSpan.FromSeconds(15);
 });
 builder.Services.AddHsts(options =>
 {
@@ -87,13 +123,12 @@ app.MapMethods("/api/{**path}", ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIO
     CancellationToken cancellationToken) =>
 {
     var request = context.Request;
-    var destination = new Uri($"https://api.mangoon.xyz{request.PathBase}{request.Path}{request.QueryString}");
+    var destination = new Uri(apiBaseUri, $"{request.PathBase}{request.Path}{request.QueryString}");
     using var upstreamRequest = new HttpRequestMessage(new HttpMethod(request.Method), destination);
 
     foreach (var header in request.Headers)
     {
-        if (!header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase) &&
-            !header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+        if (forwardedRequestHeaders.Contains(header.Key))
         {
             upstreamRequest.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
         }
@@ -108,20 +143,47 @@ app.MapMethods("/api/{**path}", ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIO
         }
     }
 
-    using var upstreamResponse = await httpClientFactory.CreateClient("AnxietyWatchApi")
-        .SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-    context.Response.StatusCode = (int)upstreamResponse.StatusCode;
-
-    foreach (var header in upstreamResponse.Headers.Concat(upstreamResponse.Content.Headers))
+    HttpResponseMessage upstreamResponse;
+    try
     {
-        if (!header.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) &&
-            !header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase))
+        upstreamResponse = await httpClientFactory.CreateClient("AnxietyWatchApi")
+            .SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+    }
+    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        context.Response.StatusCode = StatusCodes.Status504GatewayTimeout;
+        await context.Response.WriteAsJsonAsync(new
         {
-            context.Response.Headers[header.Key] = header.Value.ToArray();
-        }
+            title = "El servicio API tardó demasiado en responder.",
+            status = StatusCodes.Status504GatewayTimeout
+        }, cancellationToken);
+        return;
+    }
+    catch (HttpRequestException)
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            title = "El servicio API no está disponible.",
+            status = StatusCodes.Status503ServiceUnavailable
+        }, cancellationToken);
+        return;
     }
 
-    await upstreamResponse.Content.CopyToAsync(context.Response.Body, cancellationToken);
+    using (upstreamResponse)
+    {
+        context.Response.StatusCode = (int)upstreamResponse.StatusCode;
+
+        foreach (var header in upstreamResponse.Headers.Concat(upstreamResponse.Content.Headers))
+        {
+            if (forwardedResponseHeaders.Contains(header.Key))
+            {
+                context.Response.Headers[header.Key] = header.Value.ToArray();
+            }
+        }
+
+        await upstreamResponse.Content.CopyToAsync(context.Response.Body, cancellationToken);
+    }
 });
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
