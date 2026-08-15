@@ -5,13 +5,16 @@ COPY AnxietyWatch.Web.sln global.json ./
 COPY AnxietyWatch.Web/AnxietyWatch.Web.csproj AnxietyWatch.Web/
 COPY AnxietyWatch.Web.Client/AnxietyWatch.Web.Client.csproj AnxietyWatch.Web.Client/
 COPY AnxietyWatch.Web.Client.Tests/AnxietyWatch.Web.Client.Tests.csproj AnxietyWatch.Web.Client.Tests/
-RUN dotnet restore AnxietyWatch.Web/AnxietyWatch.Web.csproj
+RUN dotnet restore AnxietyWatch.Web.sln
 
 COPY . .
 RUN dotnet publish AnxietyWatch.Web/AnxietyWatch.Web.csproj \
     --configuration Release \
     --no-restore \
     --output /app/publish
+RUN test -f /app/publish/wwwroot/_framework/blazor.web.js \
+    && grep -q '"Route":"_framework/blazor.web.js"' \
+        /app/publish/AnxietyWatch.Web.staticwebassets.endpoints.json
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
