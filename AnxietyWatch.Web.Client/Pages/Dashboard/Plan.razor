@@ -3,6 +3,7 @@
 @using System.Globalization
 @using AnxietyWatch.Web.Client.Models.Api
 @inject IPlanService PlanService
+@inject IBillingService BillingService
 @inject IAuthSessionManager SessionManager
 @inject NavigationManager Navigation
 @implements IDisposable
@@ -142,13 +143,22 @@
                 </div>
 
                 <section class="upgrade-benefits" aria-labelledby="upgrade-benefits-title">
-                    <h3 id="upgrade-benefits-title">Este cambio aún no puede realizarse en línea.</h3>
-                    <p>Visita el Centro de ayuda para consultar las opciones disponibles con soporte.</p>
+                    <h3 id="upgrade-benefits-title">Pago simulado</h3>
+                    <p>No se solicitarán datos de tarjeta. Confirma para registrar el cambio de plan en el backend.</p>
+                    <label for="billing-cycle">Ciclo de facturación</label>
+                    <select id="billing-cycle" @bind="billingCycle" disabled="@isChangingPlan">
+                        <option value="monthly">Mensual</option>
+                        <option value="yearly">Anual</option>
+                    </select>
+                    @if (!string.IsNullOrWhiteSpace(changePlanMessage))
+                    {
+                        <p role="@(changePlanSucceeded ? "status" : "alert")">@changePlanMessage</p>
+                    }
                 </section>
 
                 <footer class="upgrade-modal__actions">
-                    <button class="upgrade-button upgrade-button--cancel" type="button" @onclick="ClosePlanModal">Volver</button>
-                    <button class="upgrade-button upgrade-button--confirm" type="button" @onclick="GoToHelp">Ir al Centro de ayuda</button>
+                    <button class="upgrade-button upgrade-button--cancel" type="button" @onclick="ClosePlanModal" disabled="@isChangingPlan">Volver</button>
+                    <button class="upgrade-button upgrade-button--confirm" type="button" @onclick="SimulatePaymentAsync" disabled="@isChangingPlan">@(isChangingPlan ? "Procesando..." : "Confirmar pago simulado")</button>
                 </footer>
             </section>
         </div>
@@ -163,6 +173,10 @@
     private string? currentPlanId;
     private string? errorMessage;
     private bool isLoading = true;
+    private bool isChangingPlan;
+    private bool changePlanSucceeded;
+    private string billingCycle = "monthly";
+    private string? changePlanMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -211,11 +225,46 @@
     private static string FormatPrice(decimal price) =>
         $"${price.ToString("0.00", CultureInfo.InvariantCulture)}";
 
-    private void OpenPlanModal(PlanDto plan) => selectedPlanChange = plan;
+    private void OpenPlanModal(PlanDto plan)
+    {
+        selectedPlanChange = plan;
+        billingCycle = "monthly";
+        changePlanMessage = null;
+        changePlanSucceeded = false;
+    }
 
     private void ClosePlanModal() => selectedPlanChange = null;
 
-    private void GoToHelp() => Navigation.NavigateTo("/dashboard/help");
+    private async Task SimulatePaymentAsync()
+    {
+        if (selectedPlanChange is null || isChangingPlan) return;
+        isChangingPlan = true;
+        changePlanMessage = null;
+        changePlanSucceeded = false;
+        try
+        {
+            await BillingService.SimulatePaymentAsync(
+                new SimulatePaymentRequest(selectedPlanChange.Id, billingCycle));
+            await SessionManager.RefreshSessionAsync();
+            changePlanSucceeded = true;
+            changePlanMessage = "Pago simulado registrado y plan actualizado.";
+            await LoadPlansAsync();
+        }
+        catch (ApiException exception) when (exception.StatusCode == 401)
+        {
+            await SessionManager.ClearAsync();
+            Navigation.NavigateTo("/login", replace: true);
+        }
+        catch (ApiException exception)
+        {
+            changePlanMessage = ApiErrorMessages.For(exception, "No pudimos actualizar el plan.");
+        }
+        catch
+        {
+            changePlanMessage = "No pudimos actualizar el plan. Inténtalo nuevamente.";
+        }
+        finally { isChangingPlan = false; }
+    }
 
     public void Dispose() => cancellationTokenSource.Cancel();
 }
