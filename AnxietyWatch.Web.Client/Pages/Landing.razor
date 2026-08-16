@@ -267,7 +267,7 @@
                                 }
                                 else
                                 {
-                                    <button class="plan-button plan-button--outline" type="button" disabled>Próximamente</button>
+                                    <a class="plan-button plan-button--outline" href="@GetRegistrationUrl(plan.Id)">Elegir plan</a>
                                 }
                             </div>
                         </article>
@@ -384,7 +384,7 @@
                     }
                     else
                     {
-                        <button class="modal-primary-button" type="button" disabled>Pago no disponible · Próximamente</button>
+                        <a class="modal-primary-button" href="@GetRegistrationUrl(selectedPlan.Id)">Crear cuenta para continuar</a>
                     }
                     <button class="modal-secondary-button" type="button" @onclick="ClosePlanDetails">Volver</button>
                 </footer>
