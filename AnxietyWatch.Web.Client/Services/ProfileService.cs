@@ -13,7 +13,10 @@ public interface IProfileService
     Task<MessageResponse> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken cancellationToken = default);
 }
 
-public sealed class ProfileService(HttpClient http, JsonSerializerOptions jsonOptions) : IProfileService
+public sealed class ProfileService(
+    HttpClient http,
+    IAuthSessionManager sessionManager,
+    JsonSerializerOptions jsonOptions) : IProfileService
 {
     public async Task<ProfileResponse> GetProfileAsync(CancellationToken cancellationToken = default)
     {
@@ -52,6 +55,8 @@ public sealed class ProfileService(HttpClient http, JsonSerializerOptions jsonOp
             request,
             jsonOptions,
             cancellationToken);
-        return await response.ReadApiAsync<MessageResponse>(jsonOptions, cancellationToken);
+        var result = await response.ReadApiAsync<MessageResponse>(jsonOptions, cancellationToken);
+        await sessionManager.ClearAsync();
+        return result;
     }
 }

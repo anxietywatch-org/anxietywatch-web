@@ -496,10 +496,7 @@ else
                 CurrentPassword = passwordModel.CurrentPassword,
                 NewPassword = passwordModel.NewPassword
             });
-            passwordModel = new PasswordModel();
-            showCurrentPassword = showNewPassword = showConfirmPassword = false;
-            passwordError = false;
-            passwordNotice = "Tu contraseña se actualizó correctamente.";
+            Navigation.NavigateTo("/login?passwordChanged=true", replace: true);
         }
         catch (ApiException exception)
         {

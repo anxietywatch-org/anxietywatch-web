@@ -39,6 +39,11 @@
             <div class="auth-alert auth-alert--success" role="status">Contraseña actualizada. Ya puedes iniciar sesión.</div>
         }
 
+        @if (isLoginView && PasswordChanged)
+        {
+            <div class="auth-alert auth-alert--success" role="status">Contraseña cambiada. Inicia sesión nuevamente.</div>
+        }
+
         @if (isLoginView)
         {
             <div class="auth-view auth-view--login">
@@ -302,6 +307,9 @@
 
     [SupplyParameterFromQuery(Name = "passwordReset")]
     public bool PasswordReset { get; set; }
+
+    [SupplyParameterFromQuery(Name = "passwordChanged")]
+    public bool PasswordChanged { get; set; }
 
     private readonly LoginModel loginModel = new();
     private readonly RegisterModel registerModel = new();
