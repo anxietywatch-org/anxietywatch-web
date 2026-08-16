@@ -4,6 +4,7 @@
 @using System.Globalization
 @using AnxietyWatch.Web.Client.Models.Api
 @inject IAuthService AuthService
+@inject IAuthSessionManager SessionManager
 @inject IPlanService PlanService
 @inject IBillingService BillingService
 @inject NavigationManager Navigation
@@ -473,6 +474,9 @@
             if (!IsFreePlan(SelectedPlan))
             {
                 await BillingService.SimulatePaymentAsync(new SimulatePaymentRequest(SelectedPlan.Id, billingCycle));
+                // Billing updates the account server-side; refresh the JWT/session snapshot
+                // before navigating so the dashboard immediately reflects the purchased plan.
+                await SessionManager.RefreshSessionAsync();
             }
             Navigation.NavigateTo("/dashboard");
         }
