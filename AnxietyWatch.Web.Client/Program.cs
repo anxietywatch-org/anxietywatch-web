@@ -42,6 +42,8 @@ builder.Services.AddScoped<IEpisodeService, EpisodeService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<ISupportService, SupportService>();
+// TODO(BE-02/BE-03): confirmar el contrato antes de habilitar el flujo como funcional.
+builder.Services.AddScoped<IBillingService, BillingService>();
 
 var host = builder.Build();
 await host.RunAsync();

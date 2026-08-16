@@ -16,6 +16,7 @@ public class AuthHandler : DelegatingHandler
         "api/profile",
         "api/settings",
         "api/support",
+        "api/billing",
         "api/auth/session",
         "api/auth/logout",
         "api/auth/change-password",
