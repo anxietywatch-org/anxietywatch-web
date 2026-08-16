@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using AnxietyWatch.Web.Client.Models.Api;
@@ -24,11 +25,7 @@ public static class HttpApiExtensions
         }
 
         var problem = await ReadProblemAsync(response, options, cancellationToken);
-        int? retryAfter = null;
-        if (response.Headers.RetryAfter?.Delta.HasValue == true)
-        {
-            retryAfter = (int)response.Headers.RetryAfter.Delta.Value.TotalSeconds;
-        }
+        var retryAfter = ParseRetryAfter(response.Headers);
         return new ApiResult<T> { IsSuccess = false, Problem = problem, RetryAfterSeconds = retryAfter };
     }
 
@@ -52,12 +49,23 @@ public static class HttpApiExtensions
         }
 
         var problem = await ReadProblemAsync(response, options, cancellationToken);
-        int? retryAfter = null;
-        if (response.Headers.RetryAfter?.Delta.HasValue == true)
-        {
-            retryAfter = (int)response.Headers.RetryAfter.Delta.Value.TotalSeconds;
-        }
+        var retryAfter = ParseRetryAfter(response.Headers);
         throw new ApiException(problem, (int)response.StatusCode, retryAfter);
+    }
+
+    private static int? ParseRetryAfter(HttpResponseHeaders headers)
+    {
+        if (headers.RetryAfter?.Delta.HasValue == true)
+        {
+            return Math.Max(0, (int)headers.RetryAfter.Delta.Value.TotalSeconds);
+        }
+
+        if (headers.RetryAfter?.Date.HasValue == true)
+        {
+            return Math.Max(0, (int)(headers.RetryAfter.Date.Value - DateTimeOffset.UtcNow).TotalSeconds);
+        }
+
+        return null;
     }
 
     private static async Task<ApiProblemDetails> ReadProblemAsync(
