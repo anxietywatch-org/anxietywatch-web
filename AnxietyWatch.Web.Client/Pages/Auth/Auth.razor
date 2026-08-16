@@ -5,6 +5,7 @@
 @using AnxietyWatch.Web.Client.Models.Api
 @inject IAuthService AuthService
 @inject IPlanService PlanService
+@inject IBillingService BillingService
 @inject NavigationManager Navigation
 @implements IDisposable
 
@@ -246,13 +247,11 @@
                                         type="button"
                                         role="radio"
                                         aria-checked="@(selectedPlanId == plan.Id)"
-                                        aria-disabled="@(!IsFreePlan(plan))"
-                                        disabled="@(!IsFreePlan(plan))"
                                         @onclick="() => SelectPlan(plan.Id)">
                                     <span class="plan-radio" aria-hidden="true"></span>
                                     <strong>@plan.Name</strong>
                                     <span class="plan-price">@FormatMonthlyPrice(plan)</span>
-                                    <small>@(IsFreePlan(plan) ? plan.IdealFor : "Próximamente · Pago no disponible")</small>
+                                    <small>@plan.IdealFor</small>
                                 </button>
                             }
                             </div>
@@ -273,6 +272,20 @@
                                         <li><span aria-hidden="true">✓</span>@feature</li>
                                     }
                                 </ul>
+                                @if (!IsFreePlan(selectedPlan))
+                                {
+                                    <div class="simulated-checkout" aria-labelledby="checkout-title">
+                                        <div class="simulated-checkout__header">
+                                            <div><span>Checkout de demostración</span><h3 id="checkout-title">Pago seguro simulado</h3></div>
+                                            <div class="payment-brands" aria-label="Métodos disponibles"><span class="payment-brand payment-brand--visa">VISA</span><span class="payment-brand payment-brand--mastercard">●● Mastercard</span><span class="payment-brand payment-brand--paypal">PayPal</span><span class="payment-brand payment-brand--kueski">Kueski</span></div>
+                                        </div>
+                                        <label for="demo-card-number">Número de tarjeta de prueba</label>
+                                        <input id="demo-card-number" class="form-input" inputmode="numeric" autocomplete="off" maxlength="19" placeholder="4242 4242 4242 4242" @bind="demoCardNumber" @bind:event="oninput" />
+                                        @if (!string.IsNullOrWhiteSpace(demoCardNumber)) { <small class="payment-card-hint">Red detectada: <strong>@DetectedCardBrand</strong>. El dato solo vive en memoria y nunca se envía al backend.</small> }
+                                        <div class="simulated-checkout__row"><label for="demo-expiry">Vencimiento<input id="demo-expiry" class="form-input" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="MM/AA" @bind="demoExpiry" @bind:event="oninput" /></label><label for="demo-cvv">CVV de prueba<input id="demo-cvv" class="form-input" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="123" @bind="demoCvv" @bind:event="oninput" /></label></div>
+                                        <p class="payment-security-note">Simulación sin cargos reales. No guardamos ni transmitimos tarjeta, CVV o método de pago.</p>
+                                    </div>
+                                }
                             </section>
 
                             }
@@ -282,8 +295,8 @@
                             <button class="auth-back-button" type="button" @onclick="BackToData">← Atrás</button>
                             <button class="plan-primary @GetSelectedPlanToneClass()"
                                     type="submit"
-                                    disabled="@(SelectedPlan is null || !IsFreePlan(SelectedPlan) || isPlansLoading || isSubmitting)">
-                                @(isSubmitting ? "Creando cuenta..." : GetPlanActionText())
+                                    disabled="@(SelectedPlan is null || isPlansLoading || isSubmitting)">
+                                @(isSubmitting ? "Procesando..." : GetPlanActionText())
                             </button>
                         </div>
                     </EditForm>
@@ -318,8 +331,12 @@
     private IReadOnlyList<PlanDto> plans = [];
     private bool isPlansLoading = true;
     private string? plansError;
+    private string demoCardNumber = string.Empty;
+    private string demoExpiry = string.Empty;
+    private string demoCvv = string.Empty;
 
     private PlanDto? SelectedPlan => plans.FirstOrDefault(plan => plan.Id == selectedPlanId);
+    private string DetectedCardBrand => DetectCardBrand(demoCardNumber);
 
     protected override void OnParametersSet()
     {
@@ -382,7 +399,7 @@
     {
         null => "Selecciona un plan",
         { PriceMonthly: 0 } => "Crear cuenta gratis",
-        _ => "Pago no disponible"
+        _ => "Crear cuenta y pagar simulado"
     };
 
     private string FormatMonthlyPrice(PlanDto plan)
@@ -432,9 +449,9 @@
             return;
         }
 
-        if (!IsFreePlan(SelectedPlan))
+        if (!IsFreePlan(SelectedPlan) && !IsDemoPaymentValid())
         {
-            authError = "Los planes de pago estarán disponibles próximamente. Por ahora solo puedes registrarte con el plan Gratuito.";
+            authError = "Completa los datos de tarjeta de prueba para continuar con la simulación.";
             return;
         }
 
@@ -448,9 +465,15 @@
                 FullName = registerModel.FullName,
                 Email = registerModel.Email,
                 Password = registerModel.Password,
-                PlanId = SelectedPlan!.Id,
+                // Paid signup is created as free first; the simulated checkout upgrades it immediately
+                // through the authenticated billing endpoint. No card data is included in this request.
+                PlanId = "free",
                 BillingCycle = billingCycle
             });
+            if (!IsFreePlan(SelectedPlan))
+            {
+                await BillingService.SimulatePaymentAsync(new SimulatePaymentRequest(SelectedPlan.Id, billingCycle));
+            }
             Navigation.NavigateTo("/dashboard");
         }
         catch (ApiException exception)
@@ -534,8 +557,37 @@
         }
 
         selectedPlanId = plans.FirstOrDefault(plan =>
-            IsFreePlan(plan) && plan.Id.Equals(RequestedPlan.Trim(), StringComparison.OrdinalIgnoreCase))?.Id
+            plan.Id.Equals(RequestedPlan.Trim(), StringComparison.OrdinalIgnoreCase))?.Id
             ?? plans.FirstOrDefault(IsFreePlan)?.Id;
+    }
+
+    private bool IsDemoPaymentValid() =>
+        IsLuhnValid(demoCardNumber) && demoExpiry.Length == 5 && demoCvv.Length is >= 3 and <= 4;
+
+    private static bool IsLuhnValid(string value)
+    {
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        if (digits.Length < 12 || digits.Length > 19) return false;
+        var sum = 0;
+        var alternate = false;
+        for (var index = digits.Length - 1; index >= 0; index--)
+        {
+            var digit = digits[index] - '0';
+            if (alternate && (digit *= 2) > 9) digit -= 9;
+            sum += digit;
+            alternate = !alternate;
+        }
+        return sum % 10 == 0;
+    }
+
+    private static string DetectCardBrand(string value)
+    {
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("4", StringComparison.Ordinal)) return "Visa";
+        if (digits.Length >= 2 && int.TryParse(digits[..2], out var two) && two is >= 51 and <= 55) return "Mastercard";
+        if (digits.StartsWith("6", StringComparison.Ordinal)) return "Kueski / débito";
+        if (digits.StartsWith("3", StringComparison.Ordinal)) return "American Express";
+        return "No identificada";
     }
 
     private static bool IsFreePlan(PlanDto plan) =>
