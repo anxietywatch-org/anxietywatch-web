@@ -83,7 +83,7 @@
                     <article class="option-card option-card--@plan.Id">
                         <header class="option-card__header">
                             <h3>@plan.Name</h3>
-                            @if (plan.Id == currentPlanId)
+                            @if (PlanService.IsCurrentPlan(plan, currentPlanId))
                             {
                                 <span class="change-badge change-badge--upgrade">Actual</span>
                             }
@@ -95,10 +95,10 @@
                         <p>@plan.IdealFor</p>
                         <button class="plan-action plan-action--dark"
                                 type="button"
-                                disabled="@(plan.Id == currentPlanId)"
+                                disabled="@(PlanService.IsCurrentPlan(plan, currentPlanId))"
                                 aria-label="Solicitar información para cambiar al plan @plan.Name"
                                 @onclick="() => OpenPlanModal(plan)">
-                            @(plan.Id == currentPlanId ? "Plan actual" : $"Consultar cambio a {plan.Name}")
+                            @(PlanService.IsCurrentPlan(plan, currentPlanId) ? "Plan actual" : $"Consultar cambio a {plan.Name}")
                         </button>
                     </article>
                 }
@@ -179,7 +179,7 @@
         {
             plans = await PlanService.GetPlansAsync(cancellationTokenSource.Token);
             currentPlanId = SessionManager.CurrentUser?.PlanId;
-            currentPlan = plans.FirstOrDefault(plan => plan.Id == currentPlanId);
+            currentPlan = plans.FirstOrDefault(plan => PlanService.IsCurrentPlan(plan, currentPlanId));
         }
         catch (ApiException exception) when (exception.StatusCode == 401)
         {
