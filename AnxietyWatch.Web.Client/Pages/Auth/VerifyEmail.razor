@@ -1,5 +1,6 @@
 @page "/verify-email"
 @inject IAuthService AuthService
+@inject IAuthSessionManager SessionManager
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
@@ -22,7 +23,7 @@
         else if (isVerified)
         {
             <div class="verify-email-success" role="status">Correo verificado correctamente.</div>
-            <a class="verify-email-action" href="/login">Iniciar sesión</a>
+            <a class="verify-email-action" href="@successHref">@successAction</a>
         }
         else
         {
@@ -40,6 +41,8 @@
     private bool isVerified;
     private string statusMessage = "Estamos confirmando el enlace que recibiste por correo.";
     private string errorMessage = "El enlace de verificación no contiene un token válido.";
+    private string successHref = "/login";
+    private string successAction = "Iniciar sesión";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -75,6 +78,11 @@
             await AuthService.ConfirmEmailVerificationAsync(new EmailVerificationConfirmRequest { Token = token });
             isVerified = true;
             statusMessage = "Tu cuenta ya puede usar las funciones disponibles para correos verificados.";
+            if (SessionManager.IsAuthenticated && await SessionManager.RefreshSessionAsync() is not null)
+            {
+                successHref = "/dashboard";
+                successAction = "Ir a mi panel";
+            }
         }
         catch (ApiException exception) when (exception.StatusCode == 410)
         {
