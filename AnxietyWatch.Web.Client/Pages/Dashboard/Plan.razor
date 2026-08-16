@@ -169,21 +169,36 @@
                     <div class="payment-fields">
                         <label for="plan-card-number">Número de tarjeta de prueba</label>
                         <input id="plan-card-number" type="text" inputmode="numeric" autocomplete="off" maxlength="19"
-                               placeholder="4242 4242 4242 4242" @bind="demoCardNumber" disabled="@isChangingPlan" />
+                               placeholder="4242 4242 4242 4242" value="@demoCardNumber" @oninput="HandleCardNumberInput"
+                               aria-invalid="@(ShowCardError ? "true" : "false")" disabled="@isChangingPlan" />
                         @if (!string.IsNullOrWhiteSpace(DetectedCardBrand))
                         {
                             <small class="detected-brand">Detectada: @DetectedCardBrand</small>
+                        }
+                        @if (ShowCardError)
+                        {
+                            <small class="payment-field-error" role="alert">@CardError</small>
                         }
                         <div class="payment-field-row">
                             <div>
                                 <label for="plan-card-expiry">Vencimiento</label>
                                 <input id="plan-card-expiry" type="text" inputmode="numeric" autocomplete="off" maxlength="5"
-                                       placeholder="MM/AA" @bind="demoExpiry" disabled="@isChangingPlan" />
+                                       placeholder="MM/AA" value="@demoExpiry" @oninput="HandleExpiryInput"
+                                       aria-invalid="@(ShowExpiryError ? "true" : "false")" disabled="@isChangingPlan" />
+                                @if (ShowExpiryError)
+                                {
+                                    <small class="payment-field-error" role="alert">@ExpiryError</small>
+                                }
                             </div>
                             <div>
                                 <label for="plan-card-cvv">CVV</label>
                                 <input id="plan-card-cvv" type="password" inputmode="numeric" autocomplete="off" maxlength="4"
-                                       placeholder="123" @bind="demoCvv" disabled="@isChangingPlan" />
+                                       placeholder="123" value="@demoCvv" @oninput="HandleCvvInput"
+                                       aria-invalid="@(ShowCvvError ? "true" : "false")" disabled="@isChangingPlan" />
+                                @if (ShowCvvError)
+                                {
+                                    <small class="payment-field-error" role="alert">@CvvError</small>
+                                }
                             </div>
                         </div>
                     </div>
@@ -218,10 +233,29 @@
     private string demoCardNumber = string.Empty;
     private string demoExpiry = string.Empty;
     private string demoCvv = string.Empty;
+    private bool validationAttempted;
+    private bool cardHadInvalidCharacters;
+    private bool expiryHadInvalidCharacters;
+    private bool cvvHadInvalidCharacters;
 
     private string BillingCycleLabel => billingCycle == "yearly" ? "año" : "mes";
     private decimal SelectedPlanPrice => selectedPlanChange is null ? 0 : GetPlanPrice(selectedPlanChange);
     private string DetectedCardBrand => DetectCardBrand(demoCardNumber);
+    private string CardDigits => new(demoCardNumber.Where(char.IsDigit).ToArray());
+    private string CardError => cardHadInvalidCharacters
+        ? "El número de tarjeta solo puede contener dígitos."
+        : CardDigits.Length < 13
+            ? "Introduce al menos 13 dígitos."
+            : !PassesLuhn(CardDigits) ? "El número de tarjeta de prueba no es válido." : string.Empty;
+    private string ExpiryError => expiryHadInvalidCharacters
+        ? "La fecha solo puede contener números."
+        : !IsExpiryValid() ? "Introduce una fecha válida en formato MM/AA." : string.Empty;
+    private string CvvError => cvvHadInvalidCharacters
+        ? "El CVV solo puede contener números."
+        : demoCvv.Length is not (3 or 4) ? "El CVV debe tener 3 o 4 dígitos." : string.Empty;
+    private bool ShowCardError => (validationAttempted || cardHadInvalidCharacters) && !string.IsNullOrEmpty(CardError);
+    private bool ShowExpiryError => (validationAttempted || expiryHadInvalidCharacters) && !string.IsNullOrEmpty(ExpiryError);
+    private bool ShowCvvError => (validationAttempted || cvvHadInvalidCharacters) && !string.IsNullOrEmpty(CvvError);
 
     protected override async Task OnInitializedAsync()
     {
@@ -279,6 +313,10 @@
         demoCardNumber = string.Empty;
         demoExpiry = string.Empty;
         demoCvv = string.Empty;
+        validationAttempted = false;
+        cardHadInvalidCharacters = false;
+        expiryHadInvalidCharacters = false;
+        cvvHadInvalidCharacters = false;
     }
 
     private void ClosePlanModal() => selectedPlanChange = null;
@@ -286,9 +324,10 @@
     private async Task SimulatePaymentAsync()
     {
         if (selectedPlanChange is null || isChangingPlan) return;
+        validationAttempted = true;
         if (!IsDemoPaymentValid())
         {
-            changePlanMessage = "Completa una tarjeta de prueba válida para continuar.";
+            changePlanMessage = "Revisa los campos marcados antes de confirmar el pago.";
             return;
         }
         isChangingPlan = true;
@@ -323,10 +362,46 @@
 
     private bool IsDemoPaymentValid()
     {
-        var digits = new string(demoCardNumber.Where(char.IsDigit).ToArray());
-        return digits.Length is >= 13 and <= 19 && PassesLuhn(digits)
-            && demoExpiry.Length == 5 && demoExpiry[2] == '/'
-            && demoCvv.All(char.IsDigit) && demoCvv.Length is 3 or 4;
+        return CardDigits.Length is >= 13 and <= 16 && PassesLuhn(CardDigits)
+            && IsExpiryValid() && demoCvv.All(char.IsDigit) && demoCvv.Length is 3 or 4
+            && !cardHadInvalidCharacters && !expiryHadInvalidCharacters && !cvvHadInvalidCharacters;
+    }
+
+    private void HandleCardNumberInput(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString() ?? string.Empty;
+        cardHadInvalidCharacters = raw.Any(character => !char.IsDigit(character) && !char.IsWhiteSpace(character) && character != '-');
+        var digits = new string(raw.Where(char.IsDigit).Take(16).ToArray());
+        demoCardNumber = string.Join(" ", digits.Chunk(4).Select(chunk => new string(chunk)));
+        changePlanMessage = null;
+    }
+
+    private void HandleExpiryInput(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString() ?? string.Empty;
+        expiryHadInvalidCharacters = raw.Any(character => !char.IsDigit(character) && character != '/');
+        var digits = new string(raw.Where(char.IsDigit).Take(4).ToArray());
+        demoExpiry = digits.Length > 2 ? $"{digits[..2]}/{digits[2..]}" : digits;
+        changePlanMessage = null;
+    }
+
+    private void HandleCvvInput(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString() ?? string.Empty;
+        cvvHadInvalidCharacters = raw.Any(character => !char.IsDigit(character));
+        demoCvv = new string(raw.Where(char.IsDigit).Take(4).ToArray());
+        changePlanMessage = null;
+    }
+
+    private bool IsExpiryValid()
+    {
+        if (demoExpiry.Length != 5 || demoExpiry[2] != '/' ||
+            !int.TryParse(demoExpiry[..2], out var month) ||
+            !int.TryParse(demoExpiry[3..], out var year)) return false;
+
+        if (month is < 1 or > 12) return false;
+        var now = DateTime.UtcNow;
+        return year > now.Year % 100 || year == now.Year % 100 && month >= now.Month;
     }
 
     private static bool PassesLuhn(string digits)
