@@ -75,7 +75,7 @@
         <section class="change-plan-section" aria-labelledby="change-plan-title">
             <header class="section-header">
                 <h2 id="change-plan-title">Planes disponibles</h2>
-                <p>Consulta las opciones actuales. Los cambios de plan todavía requieren asistencia.</p>
+                <p>Compara beneficios y cambia de plan con un pago simulado seguro.</p>
             </header>
 
             <div class="plans-grid">
@@ -99,7 +99,7 @@
                                 disabled="@(plan.Id == currentPlanId)"
                                 aria-label="Solicitar información para cambiar al plan @plan.Name"
                                 @onclick="() => OpenPlanModal(plan)">
-                            @(plan.Id == currentPlanId ? "Plan actual" : $"Consultar cambio a {plan.Name}")
+                            @(plan.Id == currentPlanId ? "Plan actual" : $"Elegir {plan.Name}")
                         </button>
                     </article>
                 }
@@ -116,7 +116,7 @@
                      aria-labelledby="upgrade-modal-title"
                      @onclick:stopPropagation="true">
                 <header class="upgrade-modal__header">
-                    <h2 id="upgrade-modal-title">Cambio de plan no disponible</h2>
+                    <h2 id="upgrade-modal-title">Cambiar a @selectedPlanChange.Name</h2>
                     <button class="upgrade-modal__close"
                             type="button"
                             aria-label="Cerrar aviso"
@@ -129,7 +129,7 @@
                         <article class="comparison-card comparison-card--current">
                             <span class="comparison-label">Plan actual</span>
                             <strong class="comparison-badge comparison-badge--current">@currentPlan.Name</strong>
-                            <p><strong>@FormatPrice(currentPlan.PriceMonthly)</strong><span>/mes</span></p>
+                            <p><strong>@FormatPrice(GetPlanPrice(currentPlan))</strong><span>/@BillingCycleLabel</span></p>
                         </article>
 
                         <span class="comparison-arrow" aria-hidden="true">→</span>
@@ -138,18 +138,56 @@
                     <article class="comparison-card comparison-card--new">
                         <span class="comparison-label comparison-label--accent">Plan consultado</span>
                         <strong class="comparison-badge comparison-badge--new">@selectedPlanChange.Name</strong>
-                        <p><strong>@FormatPrice(selectedPlanChange.PriceMonthly)</strong><span>/mes</span></p>
+                        <p><strong>@FormatPrice(SelectedPlanPrice)</strong><span>/@BillingCycleLabel</span></p>
                     </article>
                 </div>
 
                 <section class="upgrade-benefits" aria-labelledby="upgrade-benefits-title">
-                    <h3 id="upgrade-benefits-title">Pago simulado</h3>
-                    <p>No se solicitarán datos de tarjeta. Confirma para registrar el cambio de plan en el backend.</p>
+                    <h3 id="upgrade-benefits-title">Resumen de tu compra</h3>
+                    <ul class="modal-benefits">
+                        @foreach (var feature in selectedPlanChange.Features)
+                        {
+                            <li><span aria-hidden="true">✓</span>@feature</li>
+                        }
+                    </ul>
                     <label for="billing-cycle">Ciclo de facturación</label>
                     <select id="billing-cycle" @bind="billingCycle" disabled="@isChangingPlan">
                         <option value="monthly">Mensual</option>
                         <option value="yearly">Anual</option>
                     </select>
+                    <div class="checkout-total" aria-live="polite">
+                        <span>Total de hoy</span>
+                        <strong>@FormatPrice(SelectedPlanPrice) MXN</strong>
+                        <small>@(billingCycle == "yearly" ? "Cobertura de 12 meses" : "Cobro mensual simulado")</small>
+                    </div>
+                    <div class="payment-methods" aria-label="Métodos de pago disponibles">
+                        <span class="payment-method payment-method--visa">VISA</span>
+                        <span class="payment-method payment-method--mastercard">●● Mastercard</span>
+                        <span class="payment-method payment-method--paypal">PayPal</span>
+                        <span class="payment-method payment-method--kueski">Kueski</span>
+                    </div>
+                    <div class="payment-fields">
+                        <label for="plan-card-number">Número de tarjeta de prueba</label>
+                        <input id="plan-card-number" type="text" inputmode="numeric" autocomplete="off" maxlength="19"
+                               placeholder="4242 4242 4242 4242" @bind="demoCardNumber" disabled="@isChangingPlan" />
+                        @if (!string.IsNullOrWhiteSpace(DetectedCardBrand))
+                        {
+                            <small class="detected-brand">Detectada: @DetectedCardBrand</small>
+                        }
+                        <div class="payment-field-row">
+                            <div>
+                                <label for="plan-card-expiry">Vencimiento</label>
+                                <input id="plan-card-expiry" type="text" inputmode="numeric" autocomplete="off" maxlength="5"
+                                       placeholder="MM/AA" @bind="demoExpiry" disabled="@isChangingPlan" />
+                            </div>
+                            <div>
+                                <label for="plan-card-cvv">CVV</label>
+                                <input id="plan-card-cvv" type="password" inputmode="numeric" autocomplete="off" maxlength="4"
+                                       placeholder="123" @bind="demoCvv" disabled="@isChangingPlan" />
+                            </div>
+                        </div>
+                    </div>
+                    <p class="checkout-security">Pago de demostración: estos datos solo viven en memoria y nunca se envían ni se guardan.</p>
                     @if (!string.IsNullOrWhiteSpace(changePlanMessage))
                     {
                         <p role="@(changePlanSucceeded ? "status" : "alert")">@changePlanMessage</p>
@@ -177,6 +215,13 @@
     private bool changePlanSucceeded;
     private string billingCycle = "monthly";
     private string? changePlanMessage;
+    private string demoCardNumber = string.Empty;
+    private string demoExpiry = string.Empty;
+    private string demoCvv = string.Empty;
+
+    private string BillingCycleLabel => billingCycle == "yearly" ? "año" : "mes";
+    private decimal SelectedPlanPrice => selectedPlanChange is null ? 0 : GetPlanPrice(selectedPlanChange);
+    private string DetectedCardBrand => DetectCardBrand(demoCardNumber);
 
     protected override async Task OnInitializedAsync()
     {
@@ -231,6 +276,9 @@
         billingCycle = "monthly";
         changePlanMessage = null;
         changePlanSucceeded = false;
+        demoCardNumber = string.Empty;
+        demoExpiry = string.Empty;
+        demoCvv = string.Empty;
     }
 
     private void ClosePlanModal() => selectedPlanChange = null;
@@ -238,6 +286,11 @@
     private async Task SimulatePaymentAsync()
     {
         if (selectedPlanChange is null || isChangingPlan) return;
+        if (!IsDemoPaymentValid())
+        {
+            changePlanMessage = "Completa una tarjeta de prueba válida para continuar.";
+            return;
+        }
         isChangingPlan = true;
         changePlanMessage = null;
         changePlanSucceeded = false;
@@ -264,6 +317,40 @@
             changePlanMessage = "No pudimos actualizar el plan. Inténtalo nuevamente.";
         }
         finally { isChangingPlan = false; }
+    }
+
+    private decimal GetPlanPrice(PlanDto plan) => billingCycle == "yearly" ? plan.PriceYearly : plan.PriceMonthly;
+
+    private bool IsDemoPaymentValid()
+    {
+        var digits = new string(demoCardNumber.Where(char.IsDigit).ToArray());
+        return digits.Length is >= 13 and <= 19 && PassesLuhn(digits)
+            && demoExpiry.Length == 5 && demoExpiry[2] == '/'
+            && demoCvv.All(char.IsDigit) && demoCvv.Length is 3 or 4;
+    }
+
+    private static bool PassesLuhn(string digits)
+    {
+        var sum = 0;
+        var alternate = false;
+        for (var index = digits.Length - 1; index >= 0; index--)
+        {
+            var value = digits[index] - '0';
+            if (alternate && (value *= 2) > 9) value -= 9;
+            sum += value;
+            alternate = !alternate;
+        }
+        return sum % 10 == 0;
+    }
+
+    private static string DetectCardBrand(string value)
+    {
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("4", StringComparison.Ordinal)) return "VISA";
+        if (digits.Length >= 2 && int.TryParse(digits[..2], out var prefix) && prefix is >= 51 and <= 55) return "Mastercard";
+        if (digits.StartsWith("6", StringComparison.Ordinal)) return "Kueski / débito";
+        if (digits.StartsWith("3", StringComparison.Ordinal)) return "American Express";
+        return string.Empty;
     }
 
     public void Dispose() => cancellationTokenSource.Cancel();

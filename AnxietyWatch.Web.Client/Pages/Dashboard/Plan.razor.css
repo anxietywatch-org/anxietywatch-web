@@ -480,6 +480,71 @@
     font-size: 0.68rem;
 }
 
+.modal-benefits {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0.8rem 0 1rem 1.65rem;
+    padding: 0;
+    list-style: none;
+    color: #59665f;
+    font-size: 0.7rem;
+}
+
+.modal-benefits li { display: flex; gap: 0.45rem; align-items: baseline; }
+.modal-benefits li span { color: var(--modal-accent); font-weight: 900; }
+
+.checkout-total {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.15rem 1rem;
+    margin: 1rem 0;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--modal-border);
+    border-radius: 10px;
+    background: #f8fbf9;
+}
+
+.checkout-total span { color: #68766f; font-size: 0.7rem; }
+.checkout-total strong { color: var(--modal-accent); font-size: 1.05rem; }
+.checkout-total small { grid-column: 1 / -1; color: #8b9690; font-size: 0.63rem; }
+
+.payment-methods { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.8rem 0; }
+.payment-method {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #dce5df;
+    border-radius: 6px;
+    background: #fff;
+    color: #47564e;
+    font-size: 0.61rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+}
+.payment-method--visa { color: #1a4ca3; }
+.payment-method--mastercard { color: #b04e2d; }
+.payment-method--paypal { color: #1264a3; }
+.payment-method--kueski { color: #7c4d9d; }
+
+.payment-fields { display: grid; gap: 0.35rem; }
+.payment-fields label { color: #65736b; font-size: 0.65rem; font-weight: 800; }
+.payment-fields input,
+.upgrade-benefits select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.65rem 0.7rem;
+    border: 1px solid #d7e0da;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.72rem;
+}
+.payment-fields input:focus,
+.upgrade-benefits select:focus { border-color: var(--modal-accent); outline: 3px solid #dceee4; }
+.payment-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.payment-field-row > div { display: grid; gap: 0.35rem; }
+.detected-brand { color: var(--modal-accent); font-size: 0.63rem; font-weight: 800; }
+.checkout-security { margin: 0.8rem 0 0 0 !important; color: #738079 !important; font-size: 0.63rem !important; line-height: 1.5; }
+
 .upgrade-modal__actions {
     display: flex;
     gap: 0.75rem;
