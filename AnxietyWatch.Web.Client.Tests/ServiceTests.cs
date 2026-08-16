@@ -69,6 +69,105 @@ public sealed class ServiceTests
     }
 
     [Fact]
+    public async Task ConfirmEmailVerificationAsync_ReturnsSuccessfulMessage()
+    {
+        var service = new AuthService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/api/auth/verify-email/confirm", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"message\":\"Email verified\"}");
+        }), Mock.Of<IAuthSessionManager>(), JsonOptions);
+
+        var result = await service.ConfirmEmailVerificationAsync(new EmailVerificationConfirmRequest
+        {
+            Token = "verification-token"
+        });
+
+        Assert.Equal("Email verified", result.Message);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest, 400)]
+    [InlineData(HttpStatusCode.Gone, 410)]
+    public async Task ConfirmEmailVerificationAsync_InvalidOrExpiredToken_ThrowsExpectedStatus(
+        HttpStatusCode statusCode,
+        int expectedStatus)
+    {
+        var service = new AuthService(
+            CreateClient((request, _) =>
+            {
+                Assert.Equal(HttpMethod.Post, request.Method);
+                Assert.Equal("/api/auth/verify-email/confirm", request.RequestUri!.PathAndQuery);
+                return Json(statusCode, ProblemJson(expectedStatus));
+            }),
+            Mock.Of<IAuthSessionManager>(),
+            JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            service.ConfirmEmailVerificationAsync(new EmailVerificationConfirmRequest
+            {
+                Token = "invalid-token"
+            }));
+
+        Assert.Equal(expectedStatus, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmEmailVerificationAsync_RateLimited_ReadsRetryAfter()
+    {
+        var service = new AuthService(
+            CreateClient((request, _) =>
+            {
+                Assert.Equal(HttpMethod.Post, request.Method);
+                Assert.Equal("/api/auth/verify-email/confirm", request.RequestUri!.PathAndQuery);
+                var response = Json(HttpStatusCode.TooManyRequests, ProblemJson(429));
+                response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(45));
+                return response;
+            }),
+            Mock.Of<IAuthSessionManager>(),
+            JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            service.ConfirmEmailVerificationAsync(new EmailVerificationConfirmRequest
+            {
+                Token = "rate-limited-token"
+            }));
+
+        Assert.Equal(429, exception.StatusCode);
+        Assert.Equal(45, exception.RetryAfterSeconds);
+    }
+
+    [Fact]
+    public async Task GetEmailVerificationStatusAsync_ReturnsStatus()
+    {
+        var service = new AuthService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Equal("/api/auth/verify-email/status", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"emailVerified\":true}");
+        }), Mock.Of<IAuthSessionManager>(), JsonOptions);
+
+        var result = await service.GetEmailVerificationStatusAsync();
+
+        Assert.True(result.EmailVerified);
+    }
+
+    [Fact]
+    public async Task ResendEmailVerificationAsync_ReturnsSuccessfulMessage()
+    {
+        var service = new AuthService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/api/auth/verify-email/resend", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"message\":\"Verification email sent\"}");
+        }), Mock.Of<IAuthSessionManager>(), JsonOptions);
+
+        var result = await service.ResendEmailVerificationAsync();
+
+        Assert.Equal("Verification email sent", result.Message);
+    }
+
+    [Fact]
     public async Task GetEpisodesAsync_ReturnsEpisodes()
     {
         var service = new EpisodeService(CreateClient((request, _) =>
