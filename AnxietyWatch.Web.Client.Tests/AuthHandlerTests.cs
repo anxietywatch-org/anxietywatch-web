@@ -34,6 +34,22 @@ public sealed class AuthHandlerTests
         Assert.Equal("Bearer test-token", terminal.Authorization);
     }
 
+    [Theory]
+    [InlineData("api/billing/simulate-payment")]
+    [InlineData("api/billing/summary")]
+    [InlineData("api/billing/transactions")]
+    public async Task BillingRoutes_AttachValidToken(string route)
+    {
+        var terminal = new RecordingHandler();
+        var handler = CreateHandler(terminal);
+        using var request = new HttpRequestMessage(HttpMethod.Get, route);
+
+        using var response = await handler.InvokeAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Bearer test-token", terminal.Authorization);
+    }
+
     [Fact]
     public async Task ExternalAbsoluteRoute_DoesNotLeakToken()
     {
