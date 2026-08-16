@@ -81,3 +81,109 @@ jobs:
           name: anxietywatch-web
           path: ./publish
           if-no-files-found: error
+
+  production-smoke:
+    name: Production smoke tests
+    needs: build
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FRONTEND_BASE_URL: ${{ vars.SMOKE_FRONTEND_BASE_URL || 'https://mangoon.xyz' }}
+      BACKEND_BASE_URL: ${{ vars.SMOKE_BACKEND_BASE_URL || 'https://api.mangoon.xyz' }}
+      # Authenticated smoke tests require a dedicated non-production-user account in these repository secrets.
+      CI_TEST_EMAIL: ${{ secrets.CI_TEST_EMAIL }}
+      CI_TEST_PASSWORD: ${{ secrets.CI_TEST_PASSWORD }}
+    steps:
+      - name: Check backend health and public frontend routes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          check_200() {
+            local url="$1"
+            local status
+            status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 "$url")"
+            if [[ "$status" != "200" ]]; then
+              echo "Expected HTTP 200 from $url, received $status" >&2
+              return 1
+            fi
+          }
+
+          check_200 "$BACKEND_BASE_URL/health"
+          for route in / /login /register /forgot-password /reset-password /verify-email; do
+            check_200 "$FRONTEND_BASE_URL$route"
+          done
+
+      - name: Check frontend security headers
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          headers_file="$(mktemp)"
+          trap 'rm -f "$headers_file"' EXIT
+          curl --fail --silent --show-error --max-time 20 \
+            --dump-header "$headers_file" \
+            --output /dev/null \
+            "$FRONTEND_BASE_URL/"
+
+          grep --ignore-case --quiet '^Content-Security-Policy:' "$headers_file" || {
+            echo "Missing Content-Security-Policy header from $FRONTEND_BASE_URL/" >&2
+            exit 1
+          }
+          grep --ignore-case --quiet '^Strict-Transport-Security:' "$headers_file" || {
+            echo "Missing Strict-Transport-Security header from $FRONTEND_BASE_URL/" >&2
+            exit 1
+          }
+
+      - name: Report unavailable authenticated smoke tests
+        if: env.CI_TEST_EMAIL == '' || env.CI_TEST_PASSWORD == ''
+        run: |
+          echo "::warning::Authenticated smoke tests skipped. Configure CI_TEST_EMAIL and CI_TEST_PASSWORD with a dedicated CI account."
+
+      - name: Check authenticated API routes
+        if: env.CI_TEST_EMAIL != '' && env.CI_TEST_PASSWORD != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          login_payload="$(jq --null-input \
+            --arg email "$CI_TEST_EMAIL" \
+            --arg password "$CI_TEST_PASSWORD" \
+            '{ email: $email, password: $password }')"
+          login_file="$(mktemp)"
+          trap 'rm -f "$login_file"' EXIT
+          login_status="$(curl --silent --show-error --max-time 20 \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data "$login_payload" \
+            --output "$login_file" \
+            --write-out '%{http_code}' \
+            "$BACKEND_BASE_URL/api/auth/login")"
+          if [[ "$login_status" != "200" ]]; then
+            echo "Expected HTTP 200 from login, received $login_status" >&2
+            exit 1
+          fi
+          login_response="$(< "$login_file")"
+
+          jq --exit-status '
+            (.token | type == "string" and length > 0) and
+            (.expiresAt | type == "string" and length > 0) and
+            (.user.id | type == "string" and length > 0)
+          ' <<< "$login_response" > /dev/null
+          token="$(jq --exit-status --raw-output '.token' <<< "$login_response")"
+
+          check_authenticated_200() {
+            local url="$1"
+            local status
+            status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 \
+              --header "Authorization: Bearer $token" \
+              "$url")"
+            if [[ "$status" != "200" ]]; then
+              echo "Expected HTTP 200 from $url, received $status" >&2
+              return 1
+            fi
+          }
+
+          check_authenticated_200 "$BACKEND_BASE_URL/api/dashboard/summary"
+          check_authenticated_200 "$BACKEND_BASE_URL/api/plans"
