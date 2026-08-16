@@ -1,0 +1,49 @@
+.pending-shell {
+    display: grid;
+    min-height: calc(100vh - 150px);
+    place-items: center;
+    padding: 2.5rem 1rem;
+    background: radial-gradient(circle at top, #eef5f1 0, #f7f5ef 48%, #f3f0e9 100%);
+}
+
+.pending-card {
+    width: min(100%, 520px);
+    box-sizing: border-box;
+    padding: clamp(2rem, 6vw, 3.2rem);
+    border: 1px solid #dbe5df;
+    border-radius: 20px;
+    background: rgba(255,255,255,.96);
+    box-shadow: 0 22px 60px rgba(33,64,53,.12);
+    color: #263d35;
+    text-align: center;
+}
+
+.pending-mark {
+    display: grid;
+    width: 66px;
+    height: 66px;
+    margin: 0 auto 1.2rem;
+    place-items: center;
+    border-radius: 18px;
+    background: #e4f0ea;
+    color: #315f50;
+}
+.pending-mark svg { width: 32px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.pending-eyebrow { color: #688779; font-size: .68rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+.pending-card h1 { margin: .65rem 0 .8rem; font-family: Georgia,"Times New Roman",serif; font-size: clamp(2rem, 7vw, 2.65rem); font-weight: 500; }
+.pending-card > p { margin: 0; color: #65746e; font-size: .86rem; line-height: 1.7; }
+.pending-card > p strong { color: #315f50; overflow-wrap: anywhere; }
+.pending-help { display: grid; gap: .3rem; margin: 1.5rem 0; padding: 1rem; border-radius: 12px; background: #f5f8f6; color: #6b7973; font-size: .72rem; line-height: 1.55; }
+.pending-help strong { color: #3f554c; }
+.pending-notice { margin: 0 0 1rem !important; padding: .75rem; border: 1px solid #cfe4d8; border-radius: 9px; background: #f2faf5; color: #35634e !important; }
+.pending-notice--error { border-color: #edcccc; background: #fff7f7; color: #9b4242 !important; }
+.pending-primary, .pending-secondary { display: flex; min-height: 46px; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 10px; font-size: .74rem; font-weight: 900; text-decoration: none; }
+.pending-primary { width: 100%; border: 0; background: #315f50; color: #fff; cursor: pointer; }
+.pending-primary:disabled { cursor: not-allowed; opacity: .58; }
+.pending-secondary { margin-top: .7rem; border: 1px solid #d6e0da; color: #466055; }
+.pending-primary:focus-visible, .pending-secondary:focus-visible { outline: 3px solid #bdd7ca; outline-offset: 3px; }
+
+@media (max-width: 560px) {
+    .pending-shell { min-height: calc(100vh - 120px); padding: 1rem; }
+    .pending-card { padding: 1.6rem 1.2rem; border-radius: 15px; }
+}

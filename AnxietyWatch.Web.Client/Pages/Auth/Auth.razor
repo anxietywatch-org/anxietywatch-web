@@ -417,12 +417,12 @@
 
         try
         {
-            await AuthService.LoginAsync(new LoginRequest
+            var session = await AuthService.LoginAsync(new LoginRequest
             {
                 Email = loginModel.Email,
                 Password = loginModel.Password
             });
-            Navigation.NavigateTo("/dashboard");
+            Navigation.NavigateTo(session.User.EmailVerified ? "/dashboard" : "/verify-email/pending");
         }
         catch (ApiException exception) when (exception.StatusCode == 401)
         {
@@ -478,7 +478,7 @@
                 // before navigating so the dashboard immediately reflects the purchased plan.
                 await SessionManager.RefreshSessionAsync();
             }
-            Navigation.NavigateTo("/dashboard");
+            Navigation.NavigateTo("/verify-email/pending");
         }
         catch (ApiException exception)
         {

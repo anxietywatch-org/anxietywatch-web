@@ -1,0 +1,119 @@
+@page "/verify-email/pending"
+@inject IAuthService AuthService
+@inject IAuthSessionManager SessionManager
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Revisa tu correo | AnxietyWatch</PageTitle>
+
+<section class="pending-shell" aria-labelledby="pending-title">
+    <article class="pending-card">
+        <div class="pending-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>
+        </div>
+        <span class="pending-eyebrow">Un último paso</span>
+        <h1 id="pending-title">Revisa tu correo</h1>
+        <p>Enviamos un enlace de verificación a <strong>@email</strong>. Ábrelo para confirmar tu cuenta.</p>
+
+        <div class="pending-help">
+            <strong>¿No lo encuentras?</strong>
+            <span>Revisa spam o correo no deseado. El enlace vence en 24 horas.</span>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(notice))
+        {
+            <p class="@(isError ? "pending-notice pending-notice--error" : "pending-notice")"
+               role="@(isError ? "alert" : "status")">@notice</p>
+        }
+
+        <button class="pending-primary" type="button" @onclick="ResendAsync" disabled="@(isSending || cooldownSeconds > 0)">
+            @(isSending ? "Enviando..." : cooldownSeconds > 0 ? $"Reenviar en {cooldownSeconds} s" : "Reenviar correo")
+        </button>
+        <a class="pending-secondary" href="/dashboard">Continuar al panel por ahora</a>
+    </article>
+</section>
+
+@code {
+    private CancellationTokenSource cancellationTokenSource = new();
+    private string email = "tu dirección registrada";
+    private string? notice;
+    private bool isError;
+    private bool isSending;
+    private int cooldownSeconds = 60;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = SessionManager.CurrentUser;
+        if (user is null)
+        {
+            Navigation.NavigateTo("/login", replace: true);
+            return;
+        }
+
+        if (user.EmailVerified)
+        {
+            Navigation.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+
+        email = user.Email;
+        _ = RunCooldownAsync(cancellationTokenSource.Token);
+        await Task.CompletedTask;
+    }
+
+    private async Task ResendAsync()
+    {
+        if (isSending || cooldownSeconds > 0) return;
+        isSending = true;
+        notice = null;
+        try
+        {
+            await AuthService.ResendEmailVerificationAsync(cancellationTokenSource.Token);
+            isError = false;
+            notice = "Listo. Enviamos un nuevo enlace de verificación.";
+            cooldownSeconds = 60;
+            _ = RunCooldownAsync(cancellationTokenSource.Token);
+        }
+        catch (ApiException exception)
+        {
+            isError = true;
+            notice = ApiErrorMessages.For(exception, "No pudimos reenviar el correo.");
+            if (exception.StatusCode == 429)
+            {
+                cooldownSeconds = Math.Max(1, exception.RetryAfterSeconds ?? 60);
+                _ = RunCooldownAsync(cancellationTokenSource.Token);
+            }
+        }
+        catch
+        {
+            isError = true;
+            notice = "No pudimos conectar con el servicio. Inténtalo nuevamente.";
+        }
+        finally
+        {
+            isSending = false;
+        }
+    }
+
+    private async Task RunCooldownAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (cooldownSeconds > 0)
+            {
+                await Task.Delay(1000, cancellationToken);
+                cooldownSeconds--;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        cancellationTokenSource.Cancel();
+        cancellationTokenSource.Dispose();
+    }
+}
