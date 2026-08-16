@@ -231,7 +231,6 @@
             return;
         }
 
-        planLimit = GetPlanLimit(user.PlanId);
         await LoadTokensAsync();
         hasLoaded = true;
         if (NewTokenRequested) OpenTokenModal();
@@ -250,8 +249,10 @@
         try
         {
             var tokens = await TokenService.GetTokensAsync();
+            var quota = await TokenService.GetQuotaAsync();
             allTokens.Clear();
             allTokens.AddRange(tokens);
+            planLimit = quota.Limit;
             RefreshVisibleTokens();
         }
         catch (ApiException exception)
@@ -437,7 +438,6 @@
 
     private void SetPageMessage(string? message, bool isError) => (pageMessage, pageMessageIsError) = (message, isError);
     private string GetTokenTypeClass(string role) => selectedRole == role ? "token-type-option is-selected" : "token-type-option";
-    private static int GetPlanLimit(string? planId) => planId?.ToLowerInvariant() switch { "family" => 5, "professional" => 20, _ => 1 };
     private static string GetRoleLabel(string role) => role.ToLowerInvariant() switch { "self" => "App Móvil (yo)", "family_member" => "Miembro familiar", "patient" => "Paciente", _ => role };
     private static string MaskToken(string code) => code.Length <= 4 ? "••••" : $"••••-{code[^4..]}";
     private static bool HasStatus(LinkTokenDto token, string status) =>

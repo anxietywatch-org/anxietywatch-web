@@ -7,6 +7,7 @@ namespace AnxietyWatch.Web.Client.Services;
 public interface ITokenService
 {
     Task<IReadOnlyList<LinkTokenDto>> GetTokensAsync(CancellationToken cancellationToken = default);
+    Task<TokenQuotaDto> GetQuotaAsync(CancellationToken cancellationToken = default);
     Task<LinkTokenDto> CreateTokenAsync(CreateTokenRequest request, CancellationToken cancellationToken = default);
     Task<SuccessResponse> DeleteTokenAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SentResponse> ShareTokenAsync(Guid id, ShareTokenRequest request, CancellationToken cancellationToken = default);
@@ -19,6 +20,12 @@ public sealed class TokenService(HttpClient http, JsonSerializerOptions jsonOpti
     {
         using var response = await http.GetAsync("api/tokens", cancellationToken);
         return await response.ReadApiAsync<IReadOnlyList<LinkTokenDto>>(jsonOptions, cancellationToken);
+    }
+
+    public async Task<TokenQuotaDto> GetQuotaAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await http.GetAsync("api/tokens/quota", cancellationToken);
+        return await response.ReadApiAsync<TokenQuotaDto>(jsonOptions, cancellationToken);
     }
 
     public async Task<LinkTokenDto> CreateTokenAsync(
