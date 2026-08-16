@@ -100,6 +100,11 @@
                                 @onclick="() => OpenPlanModal(plan)">
                             @(PlanService.IsCurrentPlan(plan, currentPlanId) ? "Plan actual" : $"Consultar cambio a {plan.Name}")
                         </button>
+                        @if (!IsFreePlan(plan) && !PlanService.IsCurrentPlan(plan, currentPlanId))
+                        {
+                            <a class="plan-action plan-action--sage plan-checkout-link"
+                               href="@GetCheckoutUrl(plan)">Elegir en simulación</a>
+                        }
                     </article>
                 }
             </div>
@@ -216,6 +221,12 @@
     private void ClosePlanModal() => selectedPlanChange = null;
 
     private void GoToHelp() => Navigation.NavigateTo("/dashboard/help");
+
+    private static bool IsFreePlan(PlanDto plan) =>
+        plan.Id.Equals("free", StringComparison.OrdinalIgnoreCase);
+
+    private static string GetCheckoutUrl(PlanDto plan) =>
+        $"/dashboard/checkout?plan={Uri.EscapeDataString(plan.Id)}";
 
     public void Dispose() => cancellationTokenSource.Cancel();
 }

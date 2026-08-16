@@ -1,0 +1,270 @@
+@page "/dashboard/checkout"
+@layout DashboardLayout
+@using System.Globalization
+@using AnxietyWatch.Web.Client.Models.Api
+@inject IPlanService PlanService
+@inject IBillingService BillingService
+@inject IAuthSessionManager SessionManager
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Pago simulado | AnxietyWatch</PageTitle>
+
+<section class="checkout-page" aria-labelledby="checkout-title">
+    <header class="checkout-header">
+        <span>Maqueta de facturación</span>
+        <h1 id="checkout-title">Elegir un plan</h1>
+        <p>Configura una operación de prueba para el plan y ciclo que quieras revisar.</p>
+    </header>
+
+    <aside class="simulation-notice" role="note" aria-label="Aviso de pago simulado">
+        <span class="simulation-notice__icon" aria-hidden="true">i</span>
+        <div>
+            <strong>Esto es un pago simulado.</strong>
+            <p>No se procesan pagos reales ni se solicitan datos bancarios.</p>
+        </div>
+    </aside>
+
+    @if (isLoading)
+    {
+        <div class="checkout-state" role="status">Cargando planes disponibles...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <div class="checkout-state checkout-state--error" role="alert">
+            <p>@loadError</p>
+            <button class="checkout-secondary" type="button" @onclick="LoadPlansAsync">Reintentar</button>
+        </div>
+    }
+    else if (plans.Count == 0)
+    {
+        <div class="checkout-state" role="status">No hay planes disponibles para simular.</div>
+    }
+    else
+    {
+        <div class="checkout-grid">
+            <form class="checkout-form" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+                <div class="checkout-field">
+                    <label for="checkout-plan">Plan</label>
+                    <select id="checkout-plan" @bind="selectedPlanId" disabled="@isSubmitting">
+                        @foreach (var plan in plans)
+                        {
+                            <option value="@plan.Id">@plan.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <fieldset class="cycle-options" disabled="@isSubmitting">
+                    <legend>Ciclo de facturación</legend>
+                    <InputRadioGroup @bind-Value="billingCycle">
+                        @foreach (var cycle in BillingCycles)
+                        {
+                            <label class="cycle-option cycle-option--@(billingCycle == cycle.Value ? "selected" : "default")">
+                                <InputRadio Value="@cycle.Value" />
+                                <span>
+                                    <strong>@cycle.Label</strong>
+                                    <small>@FormatCyclePrice(cycle.Value)</small>
+                                </span>
+                            </label>
+                        }
+                    </InputRadioGroup>
+                </fieldset>
+
+                <div class="checkout-privacy">
+                    <strong>Sin datos de pago</strong>
+                    <p>Este formulario solo envía el identificador del plan y el ciclo seleccionado.</p>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(submitError))
+                {
+                    <div class="checkout-message checkout-message--error" role="alert">
+                        <strong>@(isUnavailable ? "Aún no disponible" : "No pudimos completar la simulación")</strong>
+                        <p>@submitError</p>
+                    </div>
+                }
+
+                <button class="checkout-submit" type="submit" disabled="@(isSubmitting || SelectedPlan is null)">
+                    @(isSubmitting ? "Simulando..." : "Confirmar pago simulado")
+                </button>
+            </form>
+
+            <aside class="checkout-summary" aria-labelledby="summary-title">
+                <span>Resumen</span>
+                <h2 id="summary-title">@(SelectedPlan?.Name ?? "Selecciona un plan")</h2>
+                @if (SelectedPlan is not null)
+                {
+                    <div class="summary-price">
+                        <strong>@FormatPrice(SelectedPrice)</strong>
+                        <span>/@(billingCycle == "annual" ? "año" : "mes")</span>
+                    </div>
+                    <p>@SelectedPlan.IdealFor</p>
+                }
+
+                @if (payment is not null)
+                {
+                    <div class="checkout-message checkout-message--success" role="status">
+                        <strong>Simulación completada</strong>
+                        <p>Transacción @payment.TransactionId · @payment.Status</p>
+                    </div>
+                }
+            </aside>
+        </div>
+    }
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "plan")]
+    public string? RequestedPlanId { get; set; }
+
+    private static readonly (string Value, string Label)[] BillingCycles =
+    [
+        ("monthly", "Mensual"),
+        ("annual", "Anual")
+    ];
+
+    private readonly CancellationTokenSource cancellationTokenSource = new();
+    private IReadOnlyList<PlanDto> plans = [];
+    private string selectedPlanId = string.Empty;
+    private string billingCycle = "monthly";
+    private string? loadError;
+    private string? submitError;
+    private SimulatePaymentResponse? payment;
+    private bool isLoading = true;
+    private bool isSubmitting;
+    private bool isUnavailable;
+
+    private PlanDto? SelectedPlan => plans.FirstOrDefault(plan =>
+        string.Equals(plan.Id, selectedPlanId, StringComparison.OrdinalIgnoreCase));
+
+    private decimal SelectedPrice => billingCycle == "annual"
+        ? SelectedPlan?.PriceYearly ?? 0
+        : SelectedPlan?.PriceMonthly ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (SessionManager.CurrentUser is null)
+        {
+            await RedirectToLoginAsync();
+            return;
+        }
+
+        await LoadPlansAsync();
+    }
+
+    private async Task LoadPlansAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        try
+        {
+            plans = await PlanService.GetPlansAsync(cancellationTokenSource.Token);
+            selectedPlanId = plans.FirstOrDefault(plan =>
+                    !string.IsNullOrWhiteSpace(RequestedPlanId) &&
+                    string.Equals(plan.Id, RequestedPlanId, StringComparison.OrdinalIgnoreCase))?.Id
+                ?? plans.FirstOrDefault(plan => PlanService.IsCurrentPlan(plan, SessionManager.CurrentUser?.PlanId))?.Id
+                ?? plans.FirstOrDefault()?.Id
+                ?? string.Empty;
+        }
+        catch (ApiException exception) when (exception.StatusCode == 401)
+        {
+            await RedirectToLoginAsync();
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        catch (ApiException exception)
+        {
+            plans = [];
+            loadError = ApiErrorMessages.For(exception, "No pudimos cargar los planes.");
+        }
+        catch (Exception)
+        {
+            plans = [];
+            loadError = "No pudimos cargar los planes. Inténtalo nuevamente.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (SelectedPlan is null || isSubmitting) return;
+
+        isSubmitting = true;
+        isUnavailable = false;
+        submitError = null;
+        payment = null;
+        try
+        {
+            payment = await BillingService.SimulatePaymentAsync(
+                new SimulatePaymentRequest
+                {
+                    PlanId = SelectedPlan.Id,
+                    BillingCycle = billingCycle
+                },
+                cancellationTokenSource.Token);
+            await RefreshSessionAfterPlanChangeAsync(payment.PlanId);
+        }
+        catch (ApiException exception) when (exception.StatusCode == 401)
+        {
+            await RedirectToLoginAsync();
+        }
+        catch (ApiException exception) when (exception.StatusCode is 404 or 501)
+        {
+            isUnavailable = true;
+            submitError = "La simulación de pagos todavía no está habilitada por el backend.";
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        catch (ApiException exception)
+        {
+            submitError = ApiErrorMessages.For(exception, "No pudimos completar la simulación.");
+        }
+        catch (HttpRequestException)
+        {
+            submitError = "No pudimos conectar con el servicio. Inténtalo más tarde.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task RefreshSessionAfterPlanChangeAsync(string planId)
+    {
+        // TODO(BE-02): confirmar cómo se debe refrescar la sesión tras cambiar de plan.
+        var user = SessionManager.CurrentUser;
+        if (user is null) return;
+
+        await SessionManager.UpdateUserAsync(new UserDto
+        {
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            PlanId = planId,
+            EmailVerified = user.EmailVerified,
+            AvatarUrl = user.AvatarUrl
+        });
+    }
+
+    private async Task RedirectToLoginAsync()
+    {
+        await SessionManager.ClearAsync();
+        Navigation.NavigateTo("/login", replace: true);
+    }
+
+    private string FormatCyclePrice(string cycle) =>
+        FormatPrice(cycle == "annual" ? SelectedPlan?.PriceYearly ?? 0 : SelectedPlan?.PriceMonthly ?? 0);
+
+    private static string FormatPrice(decimal price) =>
+        $"${price.ToString("0.00", CultureInfo.InvariantCulture)}";
+
+    public void Dispose()
+    {
+        cancellationTokenSource.Cancel();
+        cancellationTokenSource.Dispose();
+    }
+}

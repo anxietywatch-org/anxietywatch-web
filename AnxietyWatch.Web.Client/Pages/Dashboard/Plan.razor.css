@@ -274,6 +274,11 @@
     background: var(--purple);
 }
 
+.plan-checkout-link {
+    margin-top: 0.65rem;
+    text-decoration: none;
+}
+
 .upgrade-overlay {
     position: fixed;
     z-index: 200;
