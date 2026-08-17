@@ -1,7 +1,6 @@
 @page "/dashboard/tokens"
 @layout DashboardLayout
 @using AnxietyWatch.Web.Client.Models.Api
-@using System.Net.Mail
 @inject ITokenService TokenService
 @inject IAuthSessionManager SessionManager
 @inject IJSRuntime JS
@@ -95,7 +94,7 @@
                                         <td><span class="status-badge @GetStatusClass(token)">@GetStatusLabel(token)</span></td>
                                         <td>
                                             <div class="row-actions">
-                                                <button type="button" aria-label="Compartir token" title="@(IsExpired(token) ? "El token expiró" : "Compartir")" @onclick="() => OpenShareModal(token)" disabled="@(mutationInProgress || IsDeleted(token) || IsExpired(token))"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2" /><circle cx="6" cy="12" r="2" /><circle cx="18" cy="19" r="2" /><path d="m8 11 8-5m-8 7 8 5" /></svg></button>
+                                                <button type="button" aria-label="Copiar token" title="Copiar" @onclick="() => CopyTokenAsync(token.Code)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg></button>
                                                 <button type="button" aria-label="Eliminar token" title="@(CanDelete(token) ? "Eliminar" : "Solo los tokens pendientes pueden eliminarse")" @onclick="() => DeleteTokenAsync(token)" disabled="@(mutationInProgress || !CanDelete(token))"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-10 4v5m4-5v5M8 7l1-3h6l1 3m2 0-1 13H7L6 7" /></svg></button>
                                             </div>
                                         </td>
@@ -131,12 +130,24 @@
                     <button type="button" aria-label="Cerrar modal" @onclick="CloseTokenModal" disabled="@isCreating">×</button>
                 </header>
                 <div class="token-usage-banner"><span>Cuota utilizada</span><strong>@quotaTokenCount de @planLimit</strong></div>
-                @if (!isLimitReached)
+                @if (generatedToken is not null)
+                {
+                    <section class="generated-token" aria-labelledby="generated-token-title">
+                        <h3 id="generated-token-title">Token generado</h3>
+                        <div class="generated-token__field"><code>@generatedToken.Code</code><button type="button" @onclick="() => CopyTokenAsync(generatedToken.Code)" aria-label="Copiar token generado"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>Copiar</button></div>
+                        <p>Expira el @(generatedToken.ExpiresAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")).</p>
+                    </section>
+                }
+                else if (isLimitReached)
+                {
+                    <section class="limit-reached" aria-labelledby="limit-reached-title"><span class="limit-reached__icon" aria-hidden="true">!</span><h3 id="limit-reached-title">Límite alcanzado</h3><p>Tu plan permite hasta @planLimit tokens activos. Elimina uno existente o actualiza tu plan.</p><button type="button" @onclick="CloseTokenModal">Entendido</button></section>
+                }
+                else
                 {
                     <section class="token-type-section" aria-labelledby="token-type-title">
                         <h3 id="token-type-title">Tipo de token</h3>
                         <div class="token-type-options" role="radiogroup" aria-labelledby="token-type-title">
-                            @foreach (var option in tokenRoles)
+                            @foreach (var option in GetTokenRoles())
                             {
                                 <button type="button" role="radio" aria-checked="@(selectedRole == option.Role)" class="@GetTokenTypeClass(option.Role)" @onclick="() => SelectRole(option.Role)" disabled="@isCreating">
                                     <span class="radio-indicator" aria-hidden="true"></span><span><strong>@option.Label</strong><small>@option.Description</small></span>
@@ -144,56 +155,25 @@
                             }
                         </div>
                     </section>
-                    @if (generatedToken is null)
-                    {
-                        <button class="generate-token-button" type="button" @onclick="CreateTokenAsync" disabled="@isCreating">
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m9.5-3A7 7 0 0 0 6 7m-.5 8A7 7 0 0 0 18 17" /></svg>@(isCreating ? "Generando..." : "Generar código")
-                        </button>
-                    }
-                    else
-                    {
-                        <section class="generated-token" aria-labelledby="generated-token-title">
-                            <h3 id="generated-token-title">Token generado</h3>
-                            <div class="generated-token__field"><code>@generatedToken.Code</code><button type="button" @onclick="() => CopyTokenAsync(generatedToken.Code)" aria-label="Copiar token generado"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>Copiar</button></div>
-                            <p>Expira el @(generatedToken.ExpiresAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")).</p>
-                        </section>
-                    }
+                    <button class="generate-token-button" type="button" @onclick="CreateTokenAsync" disabled="@isCreating">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m9.5-3A7 7 0 0 0 6 7m-.5 8A7 7 0 0 0 18 17" /></svg>@(isCreating ? "Generando..." : "Generar código")
+                    </button>
+                }
+                @if (generatedToken is not null || !isLimitReached)
+                {
                     @if (!string.IsNullOrWhiteSpace(modalMessage)) { <p class="modal-message" role="alert">@modalMessage</p> }
                     <footer class="token-modal__actions"><button class="token-modal-button token-modal-button--cancel" type="button" @onclick="CloseTokenModal" disabled="@isCreating">@(generatedToken is null ? "Cancelar" : "Cerrar")</button></footer>
-                }
-                else
-                {
-                    <section class="limit-reached" aria-labelledby="limit-reached-title"><span class="limit-reached__icon" aria-hidden="true">!</span><h3 id="limit-reached-title">Límite alcanzado</h3><p>Tu plan permite hasta @planLimit tokens activos. Elimina uno existente o actualiza tu plan.</p><button type="button" @onclick="CloseTokenModal">Entendido</button></section>
                 }
             </section>
         </div>
     }
 
-    @if (shareToken is not null)
-    {
-        <div class="token-modal-overlay" role="presentation" @onclick="CloseShareModal">
-            <section class="token-modal share-modal" role="dialog" aria-modal="true" aria-labelledby="share-modal-title" @onclick:stopPropagation="true">
-                <header class="token-modal__header"><span class="token-modal__key" aria-hidden="true">@@</span><h2 id="share-modal-title">Compartir token</h2><button type="button" aria-label="Cerrar modal" @onclick="CloseShareModal" disabled="@isSharing">×</button></header>
-                <p class="share-modal__description">Envía el token seleccionado por correo electrónico.</p>
-                <label class="share-email-label" for="share-email">Correo del destinatario</label>
-                <input id="share-email" class="share-email-input" type="email" autocomplete="email" maxlength="254" @bind="shareEmail" disabled="@isSharing" />
-                @if (!string.IsNullOrWhiteSpace(shareMessage)) { <p class="modal-message @(shareSucceeded ? "modal-message--success" : null)" role="@(shareSucceeded ? "status" : "alert")">@shareMessage</p> }
-                <footer class="token-modal__actions"><button class="token-modal-button token-modal-button--cancel" type="button" @onclick="CloseShareModal" disabled="@isSharing">Cerrar</button><button class="token-modal-button token-modal-button--add" type="button" @onclick="ShareTokenAsync" disabled="@(isSharing || shareSucceeded)">@(isSharing ? "Enviando..." : "Enviar")</button></footer>
-            </section>
-        </div>
-    }
 </section>
 
 @code {
     [SupplyParameterFromQuery(Name = "new")] public bool NewTokenRequested { get; set; }
 
     private readonly List<LinkTokenDto> allTokens = [];
-    private readonly (string Role, string Label, string Description)[] tokenRoles =
-    [
-        ("self", "App Móvil (yo)", "Vincula tu dispositivo personal"),
-        ("family_member", "Miembro familiar", "Invita a un miembro de tu familia"),
-        ("patient", "Paciente", "Invita a un paciente a vincularse")
-    ];
     private List<LinkTokenDto> visibleTokens = [];
     private bool isLoading = true;
     private bool loadFailed;
@@ -201,26 +181,21 @@
     private bool showTokenModal;
     private bool isCreating;
     private bool isDeleting;
-    private bool isSharing;
     private bool isExporting;
-    private bool shareSucceeded;
     private int planLimit = 1;
+    private int quotaTokenCount;
     private string selectedRole = "self";
     private string? pageMessage;
     private bool pageMessageIsError;
     private string? modalMessage;
     private LinkTokenDto? generatedToken;
-    private LinkTokenDto? shareToken;
-    private string shareEmail = string.Empty;
-    private string? shareMessage;
 
-    private int quotaTokenCount => allTokens.Count(token => !IsDeleted(token));
     private int pendingTokenCount => allTokens.Count(token => HasStatus(token, "pending") && !IsVisuallyExpired(token));
     private int expiredTokenCount => allTokens.Count(IsExpired);
     private int acceptedTokenCount => allTokens.Count(token => HasStatus(token, "accepted"));
     private int usagePercent => planLimit == 0 ? 0 : Math.Min(100, (int)Math.Round(quotaTokenCount * 100d / planLimit));
     private bool isLimitReached => quotaTokenCount >= planLimit;
-    private bool mutationInProgress => isCreating || isDeleting || isSharing || isExporting;
+    private bool mutationInProgress => isCreating || isDeleting || isExporting;
 
     protected override async Task OnInitializedAsync()
     {
@@ -231,6 +206,7 @@
             return;
         }
 
+        EnsureSelectedRoleIsValid();
         await LoadTokensAsync();
         hasLoaded = true;
         if (NewTokenRequested) OpenTokenModal();
@@ -253,6 +229,7 @@
             allTokens.Clear();
             allTokens.AddRange(tokens);
             planLimit = quota.Limit;
+            quotaTokenCount = quota.Used;
             RefreshVisibleTokens();
         }
         catch (ApiException exception)
@@ -277,6 +254,7 @@
         {
             generatedToken = await TokenService.CreateTokenAsync(new CreateTokenRequest { Role = selectedRole });
             allTokens.Add(generatedToken);
+            await RefreshQuotaAsync();
             RefreshVisibleTokens();
         }
         catch (ApiException exception) { modalMessage = await HandleApiExceptionAsync(exception); }
@@ -298,6 +276,7 @@
         {
             await TokenService.DeleteTokenAsync(id);
             allTokens.Remove(token);
+            await RefreshQuotaAsync();
             RefreshVisibleTokens();
             SetPageMessage("Token eliminado correctamente.", false);
         }
@@ -308,54 +287,6 @@
         catch (ApiException exception) { await HandleApiExceptionAsync(exception, "No pudimos eliminar el token."); }
         catch { SetPageMessage("No pudimos eliminar el token. Inténtalo nuevamente.", true); }
         finally { isDeleting = false; }
-    }
-
-    private void OpenShareModal(LinkTokenDto token)
-    {
-        if (IsExpired(token))
-        {
-            SetPageMessage("Este token ya expiró y no se puede compartir.", true);
-            return;
-        }
-
-        shareToken = token;
-        shareEmail = string.Empty;
-        shareMessage = null;
-        shareSucceeded = false;
-    }
-
-    private async Task ShareTokenAsync()
-    {
-        if (shareToken is null || isSharing) return;
-        if (IsExpired(shareToken))
-        {
-            shareSucceeded = false;
-            shareMessage = "Este token ya expiró y no se puede compartir.";
-            return;
-        }
-        if (shareEmail.Trim().Length > 254 || !MailAddress.TryCreate(shareEmail.Trim(), out _))
-        {
-            shareMessage = "Ingresa un correo electrónico válido.";
-            shareSucceeded = false;
-            return;
-        }
-        if (!Guid.TryParse(shareToken.Id, out var id))
-        {
-            shareMessage = "El identificador del token no es válido.";
-            return;
-        }
-
-        isSharing = true;
-        shareMessage = null;
-        try
-        {
-            var result = await TokenService.ShareTokenAsync(id, new ShareTokenRequest { RecipientEmail = shareEmail.Trim() });
-            shareSucceeded = result.Sent;
-            shareMessage = result.Sent ? "Token enviado correctamente." : "El servicio no confirmó el envío. Inténtalo nuevamente.";
-        }
-        catch (ApiException exception) { shareSucceeded = false; shareMessage = await HandleApiExceptionAsync(exception); }
-        catch { shareSucceeded = false; shareMessage = "No pudimos compartir el token. Inténtalo nuevamente."; }
-        finally { isSharing = false; }
     }
 
     private async Task ExportTokensAsync()
@@ -408,6 +339,7 @@
 
     private void OpenTokenModal()
     {
+        EnsureSelectedRoleIsValid();
         showTokenModal = true;
         generatedToken = null;
         modalMessage = null;
@@ -422,13 +354,6 @@
         if (NewTokenRequested) Navigation.NavigateTo("/dashboard/tokens", replace: true);
     }
 
-    private void CloseShareModal()
-    {
-        if (isSharing) return;
-        shareToken = null;
-        shareMessage = null;
-    }
-
     private void SelectRole(string role)
     {
         selectedRole = role;
@@ -438,7 +363,47 @@
 
     private void SetPageMessage(string? message, bool isError) => (pageMessage, pageMessageIsError) = (message, isError);
     private string GetTokenTypeClass(string role) => selectedRole == role ? "token-type-option is-selected" : "token-type-option";
-    private static string GetRoleLabel(string role) => role.ToLowerInvariant() switch { "self" => "App Móvil (yo)", "family_member" => "Miembro familiar", "patient" => "Paciente", _ => role };
+    private (string Role, string Label, string Description)[] GetTokenRoles() =>
+        SessionManager.CurrentUser?.PlanId?.ToLowerInvariant() switch
+        {
+            "individual" => [("self", "Paciente", "Vincula tu cuenta individual")],
+            "family" =>
+            [
+                ("patient", "Paciente", "Invita al paciente a vincularse"),
+                ("family_member", "Cuidador/familiar", "Invita a un cuidador o familiar")
+            ],
+            "professional" =>
+            [
+                // TODO(BE-04): agregar Colaborador/profesional cuando backend confirme el valor de Role.
+                ("patient", "Paciente", "Invita a un paciente a vincularse")
+            ],
+            _ => [("self", "App Móvil (yo)", "Vincula tu dispositivo personal")]
+        };
+
+    private void EnsureSelectedRoleIsValid()
+    {
+        var availableRoles = GetTokenRoles();
+        if (!availableRoles.Any(option => string.Equals(option.Role, selectedRole, StringComparison.OrdinalIgnoreCase)))
+        {
+            selectedRole = availableRoles[0].Role;
+        }
+    }
+
+    private async Task RefreshQuotaAsync()
+    {
+        var quota = await TokenService.GetQuotaAsync();
+        planLimit = quota.Limit;
+        quotaTokenCount = quota.Used;
+    }
+
+    private string GetRoleLabel(string role)
+    {
+        var availableRole = GetTokenRoles().FirstOrDefault(option =>
+            string.Equals(option.Role, role, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(availableRole.Role)) return availableRole.Label;
+
+        return role.ToLowerInvariant() switch { "self" => "App Móvil (yo)", "family_member" => "Miembro familiar", "patient" => "Paciente", _ => role };
+    }
     private static string MaskToken(string code) => code.Length <= 4 ? "••••" : $"••••-{code[^4..]}";
     private static bool HasStatus(LinkTokenDto token, string status) =>
         string.Equals(token.Status, status, StringComparison.OrdinalIgnoreCase);
