@@ -14,9 +14,13 @@
         <div>
             <h1 id="dashboard-title">Bienvenido@(string.IsNullOrWhiteSpace(userName) ? string.Empty : $", {userName}")</h1>
             <p>Plan activo: @PlanName <span aria-hidden="true">·</span> Hoy es @CurrentDate.</p>
+            @if (HasWearableIntegration)
+            {
+                <p class="wearable-note">Los registros del dispositivo vinculado llegan automáticamente. El registro manual sigue disponible como complemento.</p>
+            }
         </div>
-        <a class="primary-action" href="/dashboard/episodes">
-            <span aria-hidden="true">+</span> Registrar episodio
+        <a class="primary-action @(HasWearableIntegration ? "primary-action--secondary" : null)" href="/dashboard/episodes">
+            <span aria-hidden="true">+</span> @(HasWearableIntegration ? "Añadir registro manual" : "Registrar episodio")
         </a>
     </header>
 
@@ -125,8 +129,10 @@
         {
             <div class="chart-state">
                 <strong>Aún no hay episodios en este periodo.</strong>
-                <span>Registra cómo te sientes para empezar a ver tu evolución.</span>
-                <a href="/dashboard/episodes">Registrar episodio</a>
+                <span>@(HasWearableIntegration
+                    ? "Los datos del dispositivo aparecerán aquí cuando estén disponibles; también puedes añadir un registro manual."
+                    : "Registra cómo te sientes para empezar a ver tu evolución.")</span>
+                <a href="/dashboard/episodes">@(HasWearableIntegration ? "Añadir registro manual" : "Registrar episodio")</a>
             </div>
         }
         else
@@ -187,6 +193,8 @@
     private string WeeklyLimit => summary?.WeeklyRecords.Limit is int limit
         ? $"Límite semanal: {limit}"
         : "Sin límite semanal";
+    private bool HasWearableIntegration => planId?.Trim().ToLowerInvariant() is
+        "individual" or "family" or "familiar" or "professional" or "profesional";
     private string NormalizedTrend => summary?.AnxietyLevel.Trend.Trim().ToLowerInvariant() ?? "stable";
     private string TrendIcon => NormalizedTrend switch { "up" => "↑", "down" => "↓", _ => "−" };
     private string TrendCss => NormalizedTrend switch { "up" => "up", "down" => "down", _ => "stable" };
