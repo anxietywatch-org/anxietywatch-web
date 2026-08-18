@@ -2,21 +2,23 @@ using AnxietyWatch.Web.Client.Models.Auth;
 using AnxietyWatch.Web.Client.Pages.Auth;
 using AnxietyWatch.Web.Client.Services;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace AnxietyWatch.Web.Client.Tests;
 
-public sealed class AuthTokenFlowTests : TestContext
+public sealed class AuthTokenFlowTests
 {
     [Fact]
     public void ResetPassword_HashTokenFlow_ShowsResolvingThenForm()
     {
+        using var ctx = new BunitContext();
         var auth = new RecordingAuthService();
-        Services.AddSingleton<IAuthService>(auth);
-        var plannedInvocation = JSInterop.Setup<string>("anxietyWatch.authToken.consume");
+        ctx.Services.AddSingleton<IAuthService>(auth);
+        var plannedInvocation = ctx.JSInterop.Setup<string>("anxietyWatch.authToken.consume");
 
-        var cut = RenderComponent<ResetPassword>();
+        var cut = ctx.Render<ResetPassword>();
 
         Assert.Contains("Validando tu enlace de recuperación", cut.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("no contiene un token válido", cut.Markup, StringComparison.OrdinalIgnoreCase);
@@ -29,12 +31,15 @@ public sealed class AuthTokenFlowTests : TestContext
     [Fact]
     public void ResetPassword_QueryTokenFallback_KeepsTokenUsable()
     {
+        using var ctx = new BunitContext();
         var auth = new RecordingAuthService();
-        Services.AddSingleton<IAuthService>(auth);
-        var plannedInvocation = JSInterop.Setup<string>("anxietyWatch.authToken.consume");
+        ctx.Services.AddSingleton<IAuthService>(auth);
+        var plannedInvocation = ctx.JSInterop.Setup<string>("anxietyWatch.authToken.consume");
+        var navigation = ctx.Services.GetRequiredService<NavigationManager>();
+        var uriWithToken = navigation.GetUriWithQueryParameter("token", "QUERY_TOKEN");
+        navigation.NavigateTo(uriWithToken);
 
-        var cut = RenderComponent<ResetPassword>(parameters =>
-            parameters.Add(component => component.QueryToken, "QUERY_TOKEN"));
+        var cut = ctx.Render<ResetPassword>();
 
         plannedInvocation.SetResult(string.Empty);
 
@@ -54,11 +59,12 @@ public sealed class AuthTokenFlowTests : TestContext
     [Fact]
     public void ResetPassword_NoToken_ShowsInvalidTokenOnlyAfterResolution()
     {
+        using var ctx = new BunitContext();
         var auth = new RecordingAuthService();
-        Services.AddSingleton<IAuthService>(auth);
-        var plannedInvocation = JSInterop.Setup<string>("anxietyWatch.authToken.consume");
+        ctx.Services.AddSingleton<IAuthService>(auth);
+        var plannedInvocation = ctx.JSInterop.Setup<string>("anxietyWatch.authToken.consume");
 
-        var cut = RenderComponent<ResetPassword>();
+        var cut = ctx.Render<ResetPassword>();
 
         Assert.Contains("Validando tu enlace de recuperación", cut.Markup, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("no contiene un token válido", cut.Markup, StringComparison.OrdinalIgnoreCase);
@@ -72,11 +78,12 @@ public sealed class AuthTokenFlowTests : TestContext
     [Fact]
     public void ResetPassword_SubmitsCapturedToken()
     {
+        using var ctx = new BunitContext();
         var auth = new RecordingAuthService();
-        Services.AddSingleton<IAuthService>(auth);
-        JSInterop.Setup<string>("anxietyWatch.authToken.consume").SetResult("CAPTURED_TOKEN");
+        ctx.Services.AddSingleton<IAuthService>(auth);
+        ctx.JSInterop.Setup<string>("anxietyWatch.authToken.consume").SetResult("CAPTURED_TOKEN");
 
-        var cut = RenderComponent<ResetPassword>();
+        var cut = ctx.Render<ResetPassword>();
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("form")));
 
         cut.Find("#new-password").Change("NewPassword123!");
@@ -93,12 +100,13 @@ public sealed class AuthTokenFlowTests : TestContext
     [Fact]
     public void VerifyEmail_StillConsumesTokenAndCallsService()
     {
+        using var ctx = new BunitContext();
         var auth = new RecordingAuthService();
-        Services.AddSingleton<IAuthService>(auth);
-        Services.AddSingleton<IAuthSessionManager>(new StubSessionManager());
-        JSInterop.Setup<string>("anxietyWatch.emailVerification.consumeToken").SetResult("VERIFY_TOKEN");
+        ctx.Services.AddSingleton<IAuthService>(auth);
+        ctx.Services.AddSingleton<IAuthSessionManager>(new StubSessionManager());
+        ctx.JSInterop.Setup<string>("anxietyWatch.emailVerification.consumeToken").SetResult("VERIFY_TOKEN");
 
-        var cut = RenderComponent<VerifyEmail>();
+        var cut = ctx.Render<VerifyEmail>();
 
         cut.WaitForAssertion(() =>
         {
