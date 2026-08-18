@@ -17,6 +17,7 @@
 .page-header h1 { margin: 0; color: var(--ink); font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1.15; letter-spacing: -0.035em; }
 .page-header p { margin: 0.6rem 0 0; color: var(--muted); font-size: 0.9rem; }
 .page-header p span { margin-inline: 0.35rem; color: #b2bab6; }
+.page-header .wearable-note { max-width: 650px; color: #68756f; font-size: 0.78rem; line-height: 1.55; }
 
 .primary-action {
     display: inline-flex;
@@ -35,6 +36,8 @@
 
 .primary-action span { font-size: 1.15rem; line-height: 1; }
 .primary-action:hover { background: #345d53; }
+.primary-action--secondary { border: 1px solid #bfd0c8; background: #fff; color: var(--sage-700); box-shadow: none; }
+.primary-action--secondary:hover { background: #edf4f1; }
 
 .state-panel,
 .chart-state {

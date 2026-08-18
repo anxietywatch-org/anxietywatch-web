@@ -14,7 +14,9 @@
         <div>
             <span class="eyebrow">Seguimiento</span>
             <h1 id="episodes-title">Episodios de ansiedad</h1>
-            <p>Registra lo que sientes y revisa tu historial reciente.</p>
+            <p>@(HasWearableIntegration
+                ? "Los registros del dispositivo vinculado llegan automáticamente. Aquí puedes añadir uno manualmente cuando lo necesites."
+                : "Registra lo que sientes y revisa tu historial reciente.")</p>
         </div>
         <a href="/dashboard">Volver al resumen</a>
     </header>
@@ -24,8 +26,10 @@
             <header>
                 <span class="card-icon" aria-hidden="true">+</span>
                 <div>
-                    <h2 id="create-title">Nuevo episodio</h2>
-                    <p>Completa los detalles del momento actual.</p>
+                    <h2 id="create-title">@(HasWearableIntegration ? "Registro manual" : "Nuevo episodio")</h2>
+                    <p>@(HasWearableIntegration
+                        ? "Úsalo para complementar los registros automáticos del dispositivo."
+                        : "Completa los detalles del momento actual.")</p>
                 </div>
             </header>
 
@@ -58,7 +62,7 @@
                 }
 
                 <button class="submit-button" type="submit" disabled="@IsBusy">
-                    @(isCreating ? "Guardando..." : "Guardar episodio")
+                    @(isCreating ? "Guardando..." : HasWearableIntegration ? "Guardar registro manual" : "Guardar episodio")
                 </button>
             </EditForm>
         </section>
@@ -144,6 +148,8 @@
     private string? createError;
     private string? successMessage;
     private bool IsBusy => isLoading || isCreating;
+    private bool HasWearableIntegration => SessionManager.CurrentUser?.PlanId?.Trim().ToLowerInvariant() is
+        "individual" or "family" or "familiar" or "professional" or "profesional";
 
     protected override async Task OnInitializedAsync()
     {

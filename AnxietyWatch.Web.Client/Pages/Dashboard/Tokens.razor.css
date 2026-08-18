@@ -770,41 +770,6 @@ code {
     line-height: 1.45;
 }
 
-.modal-message--success {
-    color: #39724b;
-}
-
-.share-modal__description {
-    margin: 1.25rem 0;
-    color: var(--muted);
-    font-size: 0.75rem;
-    line-height: 1.5;
-}
-
-.share-email-label {
-    display: block;
-    margin-bottom: 0.4rem;
-    color: #4f5a54;
-    font-size: 0.72rem;
-    font-weight: 800;
-}
-
-.share-email-input {
-    width: 100%;
-    min-height: 42px;
-    box-sizing: border-box;
-    padding: 0.65rem 0.75rem;
-    border: 1px solid #d7dcda;
-    border-radius: 9px;
-    color: var(--ink);
-    font: inherit;
-}
-
-.share-email-input:focus {
-    border-color: var(--sage-500);
-    outline: 3px solid rgba(94, 139, 126, 0.16);
-}
-
 .token-modal__actions {
     display: flex;
     gap: 0.75rem;
@@ -830,12 +795,6 @@ code {
     border: 1px solid #d7dcda;
     background: #fff;
     color: var(--ink);
-}
-
-.token-modal-button--add {
-    border: 1px solid var(--token-purple);
-    background: var(--token-purple);
-    color: #fff;
 }
 
 .limit-reached {
