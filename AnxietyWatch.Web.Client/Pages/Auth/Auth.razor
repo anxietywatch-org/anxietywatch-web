@@ -173,6 +173,10 @@
                                            @bind-Value="registerModel.Email" />
                             </div>
                             <ValidationMessage For="@(() => registerModel.Email)" />
+                            @if (!string.IsNullOrWhiteSpace(registerEmailError))
+                            {
+                                <div class="validation-message" role="alert">@registerEmailError</div>
+                            }
                         </div>
 
                         <div class="auth-field">
@@ -329,6 +333,7 @@
     private bool showRegisterPassword;
     private bool isSubmitting;
     private string? authError;
+    private string? registerEmailError;
     private IReadOnlyList<PlanDto> plans = [];
     private bool isPlansLoading = true;
     private string? plansError;
@@ -458,19 +463,31 @@
 
         isSubmitting = true;
         authError = null;
+        registerEmailError = null;
 
         try
         {
-            await AuthService.RegisterAsync(new RegisterRequest
+            try
             {
-                FullName = registerModel.FullName,
-                Email = registerModel.Email,
-                Password = registerModel.Password,
-                // Paid signup is created as free first; the simulated checkout upgrades it immediately
-                // through the authenticated billing endpoint. No card data is included in this request.
-                PlanId = "free",
-                BillingCycle = billingCycle
-            });
+                await AuthService.RegisterAsync(new RegisterRequest
+                {
+                    FullName = registerModel.FullName,
+                    Email = registerModel.Email,
+                    Password = registerModel.Password,
+                    // Paid signup is created as free first; the simulated checkout upgrades it immediately
+                    // through the authenticated billing endpoint. No card data is included in this request.
+                    PlanId = "free",
+                    BillingCycle = billingCycle
+                });
+            }
+            catch (ApiException exception) when (exception.StatusCode == 409)
+            {
+                registerStep = 1;
+                authError = null;
+                registerEmailError = "Este correo ya tiene una cuenta. Inicia sesión o usa otro correo.";
+                return;
+            }
+
             if (!IsFreePlan(SelectedPlan))
             {
                 await BillingService.SimulatePaymentAsync(new SimulatePaymentRequest(SelectedPlan.Id, billingCycle));
