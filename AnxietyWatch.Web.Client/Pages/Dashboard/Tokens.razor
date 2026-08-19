@@ -95,6 +95,10 @@
                                         <td>
                                             <div class="row-actions">
                                                 <button type="button" aria-label="Copiar token" title="Copiar" @onclick="() => CopyTokenAsync(token.Code)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg></button>
+                                                @if (HasStatus(token, "accepted"))
+                                                {
+                                                    <button type="button" aria-label="Revocar token" title="Revocar" @onclick="() => RevokeTokenAsync(token)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 14.5 5-5M7 17l-1.5 1.5a3.5 3.5 0 0 1-5-5L5 9a3.5 3.5 0 0 1 5 0m7 6a3.5 3.5 0 0 0 5 0l1.5-1.5a3.5 3.5 0 0 0-5-5L14 13a3.5 3.5 0 0 0 0 5" /></svg></button>
+                                                }
                                                 <button type="button" aria-label="Eliminar token" title="@(CanDelete(token) ? "Eliminar" : "Solo los tokens pendientes pueden eliminarse")" @onclick="() => DeleteTokenAsync(token)" disabled="@(mutationInProgress || !CanDelete(token))"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-10 4v5m4-5v5M8 7l1-3h6l1 3m2 0-1 13H7L6 7" /></svg></button>
                                             </div>
                                         </td>
@@ -181,6 +185,7 @@
     private bool showTokenModal;
     private bool isCreating;
     private bool isDeleting;
+    private bool isRevoking;
     private bool isExporting;
     private int planLimit = 1;
     private int quotaTokenCount;
@@ -195,7 +200,7 @@
     private int acceptedTokenCount => allTokens.Count(token => HasStatus(token, "accepted"));
     private int usagePercent => planLimit == 0 ? 0 : Math.Min(100, (int)Math.Round(quotaTokenCount * 100d / planLimit));
     private bool isLimitReached => quotaTokenCount >= planLimit;
-    private bool mutationInProgress => isCreating || isDeleting || isExporting;
+    private bool mutationInProgress => isCreating || isDeleting || isRevoking || isExporting;
 
     protected override async Task OnInitializedAsync()
     {
@@ -287,6 +292,36 @@
         catch (ApiException exception) { await HandleApiExceptionAsync(exception, "No pudimos eliminar el token."); }
         catch { SetPageMessage("No pudimos eliminar el token. Inténtalo nuevamente.", true); }
         finally { isDeleting = false; }
+    }
+
+    private async Task RevokeTokenAsync(LinkTokenDto token)
+    {
+        if (isRevoking || !Guid.TryParse(token.Id, out var id))
+        {
+            if (!Guid.TryParse(token.Id, out _)) SetPageMessage("El identificador del token no es válido.", true);
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "¿Revocar este token? El dispositivo vinculado dejará de enviar datos al plan.");
+        if (!confirmed) return;
+
+        isRevoking = true;
+        SetPageMessage(null, false);
+        try
+        {
+            await TokenService.RevokeTokenAsync(id);
+            allTokens.Remove(token);
+            await RefreshQuotaAsync();
+            RefreshVisibleTokens();
+            SetPageMessage("Token revocado correctamente.", false);
+        }
+        catch (ApiException exception) when (exception.StatusCode == 409)
+        {
+            SetPageMessage("El token ya no se puede revocar por su estado actual.", true);
+        }
+        catch (ApiException exception) { await HandleApiExceptionAsync(exception, "No pudimos revocar el token."); }
+        catch { SetPageMessage("No pudimos revocar el token. Inténtalo nuevamente.", true); }
+        finally { isRevoking = false; }
     }
 
     private async Task ExportTokensAsync()

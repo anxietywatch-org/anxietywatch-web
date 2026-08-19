@@ -10,6 +10,7 @@ public interface ITokenService
     Task<TokenQuotaDto> GetQuotaAsync(CancellationToken cancellationToken = default);
     Task<LinkTokenDto> CreateTokenAsync(CreateTokenRequest request, CancellationToken cancellationToken = default);
     Task<SuccessResponse> DeleteTokenAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<SuccessResponse> RevokeTokenAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SentResponse> ShareTokenAsync(Guid id, ShareTokenRequest request, CancellationToken cancellationToken = default);
     Task<TokenExport> ExportTokensAsync(CancellationToken cancellationToken = default);
 }
@@ -39,6 +40,12 @@ public sealed class TokenService(HttpClient http, JsonSerializerOptions jsonOpti
     public async Task<SuccessResponse> DeleteTokenAsync(Guid id, CancellationToken cancellationToken = default)
     {
         using var response = await http.DeleteAsync($"api/tokens/{id:D}", cancellationToken);
+        return await response.ReadApiAsync<SuccessResponse>(jsonOptions, cancellationToken);
+    }
+
+    public async Task<SuccessResponse> RevokeTokenAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.PostAsync($"api/tokens/{id:D}/revoke", content: null, cancellationToken);
         return await response.ReadApiAsync<SuccessResponse>(jsonOptions, cancellationToken);
     }
 
