@@ -20,7 +20,7 @@ else
 {
 <div class="dashboard-shell">
     <aside class="dashboard-sidebar">
-        <a class="sidebar-brand" href="/dashboard" aria-label="Ir al resumen de AnxietyWatch">
+        <a class="sidebar-brand" href="/dashboard/tokens" aria-label="Ir a tokens de vinculación">
             <span class="brand-mark" aria-hidden="true">
                 <svg viewBox="0 0 24 24" role="img">
                     <path d="M12 21c4.5-2.7 7-6.4 7-10.2A4.8 4.8 0 0 0 14.2 6c-.9 0-1.7.2-2.2.8A3 3 0 0 0 9.8 6 4.8 4.8 0 0 0 5 10.8C5 14.6 7.5 18.3 12 21Z" />
@@ -31,20 +31,6 @@ else
         </a>
 
         <nav class="sidebar-nav" aria-label="Navegación del dashboard">
-            <NavLink class="sidebar-link" href="/dashboard" Match="NavLinkMatch.All">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z" />
-                </svg>
-                <span>Resumen</span>
-            </NavLink>
-
-            <NavLink class="sidebar-link" href="/dashboard/plan" Match="NavLinkMatch.All">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 7.5h16v11H4v-11Zm3-3h10v3H7v-3Zm1 7h8m-8 3h5" />
-                </svg>
-                <span>Mi plan</span>
-            </NavLink>
-
             <NavLink class="sidebar-link" href="/dashboard/tokens" Match="NavLinkMatch.All">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M9.5 14.5 14.5 9M7 17l-1.5 1.5a3.5 3.5 0 0 1-5-5L5 9a3.5 3.5 0 0 1 5 0m7 6a3.5 3.5 0 0 0 5 0l1.5-1.5a3.5 3.5 0 0 0-5-5L14 13a3.5 3.5 0 0 0 0 5" />
@@ -52,11 +38,11 @@ else
                 <span>Tokens de vinculación</span>
             </NavLink>
 
-            <NavLink class="sidebar-link" href="/dashboard/episodes" Match="NavLinkMatch.All">
+            <NavLink class="sidebar-link" href="/dashboard/plan" Match="NavLinkMatch.All">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 19V9m5 10V5m5 14v-7m5 7V3" />
+                    <path d="M4 7.5h16v11H4v-11Zm3-3h10v3H7v-3Zm1 7h8m-8 3h5" />
                 </svg>
-                <span>Episodios</span>
+                <span>Mi plan</span>
             </NavLink>
 
             <NavLink class="sidebar-link" href="/dashboard/help" Match="NavLinkMatch.All">

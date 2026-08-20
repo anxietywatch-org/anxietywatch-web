@@ -80,7 +80,7 @@
             statusMessage = "Tu cuenta ya puede usar las funciones disponibles para correos verificados.";
             if (SessionManager.IsAuthenticated && await SessionManager.RefreshSessionAsync() is not null)
             {
-                successHref = "/dashboard";
+                successHref = "/dashboard/tokens";
                 successAction = "Ir a mi panel";
             }
         }

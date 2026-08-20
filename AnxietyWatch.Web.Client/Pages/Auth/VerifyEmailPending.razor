@@ -29,7 +29,7 @@
         <button class="pending-primary" type="button" @onclick="ResendAsync" disabled="@(isSending || cooldownSeconds > 0)">
             @(isSending ? "Enviando..." : cooldownSeconds > 0 ? $"Reenviar en {cooldownSeconds} s" : "Reenviar correo")
         </button>
-        <a class="pending-secondary" href="/dashboard">Continuar al panel por ahora</a>
+        <a class="pending-secondary" href="/dashboard/tokens">Continuar al panel por ahora</a>
     </article>
 </section>
 
@@ -52,7 +52,7 @@
 
         if (user.EmailVerified)
         {
-            Navigation.NavigateTo("/dashboard", replace: true);
+            Navigation.NavigateTo("/dashboard/tokens", replace: true);
             return;
         }
 
