@@ -797,6 +797,58 @@ code {
     color: var(--ink);
 }
 
+.token-modal-button--danger {
+    border: 1px solid #c83f3f;
+    background: #c83f3f;
+    color: #fff;
+}
+
+.token-modal-button--danger:hover:not(:disabled) {
+    background: #ad3232;
+}
+
+.token-modal-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+}
+
+.token-delete-modal {
+    width: min(100%, 430px);
+}
+
+.token-delete-modal__icon {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    margin-bottom: 1rem;
+    border-radius: 50%;
+    background: #feecec;
+    color: #c83f3f;
+}
+
+.token-delete-modal__icon svg {
+    width: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.token-delete-modal h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 1.15rem;
+}
+
+.token-delete-modal > p {
+    margin: 0.65rem 0 0;
+    color: #727d77;
+    font-size: 0.75rem;
+    line-height: 1.65;
+}
+
 .limit-reached {
     display: flex;
     min-height: 285px;
