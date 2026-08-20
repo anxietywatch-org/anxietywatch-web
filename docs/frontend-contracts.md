@@ -117,8 +117,31 @@ Master consulta `GET /api/tokens/quota` mediante `TokenService.GetQuotaAsync()` 
 
 Esta rama conserva esa fuente autoritativa; no calcula el límite por nombre de plan.
 
+### Role de cuidador y colaborador profesional
+
+Por decisión de producto, un colaborador/profesional cumple el mismo papel conceptual que un
+cuidador. El plan Profesional reutiliza `CreateTokenRequest.Role = "family_member"` y lo
+muestra como “Colaborador/profesional”; el plan Familiar muestra el mismo role como
+“Cuidador/familiar”. La etiqueta se resuelve con el plan actual de la cuenta.
+
+### Revocación de tokens accepted — disponible en master
+
+Los tokens `accepted` no se eliminan mediante DELETE. Master usa
+`POST /api/tokens/{id}/revoke` a través de `TokenService.RevokeTokenAsync`; la UI conserva el
+botón “Revocar” y su confirmación nativa del navegador. Esto resuelve la necesidad de
+desvincular una vinculación aceptada sin ampliar `CanDelete`, que sigue limitado a `pending`.
+
+La eliminación de un token `accepted` mediante `DELETE /api/tokens/{id}` devuelve 409:
+
+```json
+{
+  "type": "https://httpstatuses.com/409",
+  "title": "An accepted token cannot be deleted.",
+  "status": 409
+}
+```
+
 ## Solicitudes pendientes
 
 1. Endpoint seguro de disponibilidad de correo durante el primer paso del registro.
-2. Valor exacto de `CreateTokenRequest.Role` para “Colaborador/profesional”.
-3. Contrato para regenerar o refrescar un token.
+2. Contrato para regenerar o refrescar un token.
