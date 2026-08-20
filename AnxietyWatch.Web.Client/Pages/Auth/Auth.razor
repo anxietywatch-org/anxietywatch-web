@@ -427,7 +427,7 @@
                 Email = loginModel.Email,
                 Password = loginModel.Password
             });
-            Navigation.NavigateTo(session.User.EmailVerified ? "/dashboard" : "/verify-email/pending");
+            Navigation.NavigateTo(session.User.EmailVerified ? "/dashboard/tokens" : "/verify-email/pending");
         }
         catch (ApiException exception) when (exception.StatusCode == 401)
         {
