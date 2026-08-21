@@ -18,7 +18,7 @@ else if (!sessionReady)
 }
 else
 {
-<div class="dashboard-shell">
+<div class="dashboard-shell" @onkeydown="OnKeyDown">
     <aside class="dashboard-sidebar">
         <a class="sidebar-brand" href="/dashboard/tokens" aria-label="Ir a tokens de vinculación">
             <span class="brand-mark" aria-hidden="true">
@@ -30,7 +30,7 @@ else
             <span>AnxietyWatch</span>
         </a>
 
-        <nav class="sidebar-nav" aria-label="Navegación del dashboard">
+        <nav class="sidebar-nav @(isMenuOpen ? "sidebar-nav--open" : "")" aria-label="Navegación del dashboard">
             <NavLink class="sidebar-link" href="/dashboard/tokens" Match="NavLinkMatch.All">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M9.5 14.5 14.5 9M7 17l-1.5 1.5a3.5 3.5 0 0 1-5-5L5 9a3.5 3.5 0 0 1 5 0m7 6a3.5 3.5 0 0 0 5 0l1.5-1.5a3.5 3.5 0 0 0-5-5L14 13a3.5 3.5 0 0 0 0 5" />
@@ -55,22 +55,17 @@ else
 
         </nav>
 
-        <div class="sidebar-footer">
-            <button class="logout-link" type="button" disabled="@logoutPending" @onclick="LogoutAsync">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M10 5H5v14h5m4-4 4-3-4-3m4 3H9" />
-                </svg>
-                <span>@(logoutPending ? "Cerrando sesión..." : "Cerrar sesión")</span>
-            </button>
-        </div>
     </aside>
 
     <div class="dashboard-workspace">
         <header class="dashboard-topbar">
-            <a class="back-link" href="/">
-                <span>&larr; Volver al inicio</span>
-            </a>
-
+            <button class="hamburger-btn" type="button" aria-label="Abrir menú" aria-expanded="@isMenuOpen" aria-controls="sidebar-nav" @onclick="ToggleMenu">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M3 6h18" />
+                    <path d="M3 12h18" />
+                    <path d="M3 18h18" />
+                </svg>
+            </button>
             <div class="topbar-actions">
                 <a class="new-token-button" href="/dashboard/tokens?new=true">
                     <span aria-hidden="true">+</span>
@@ -144,6 +139,8 @@ else
                 </details>
             </div>
         </header>
+
+        <div class="@(isMenuOpen ? "menu-overlay menu-overlay--open" : "menu-overlay")" @onclick="() => isMenuOpen = false" role="presentation"></div>
 
         <main class="dashboard-main">
             @Body
@@ -265,6 +262,22 @@ else
         });
     }
 
+    private bool isMenuOpen;
+
+    private void ToggleMenu()
+    {
+        isMenuOpen = !isMenuOpen;
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && isMenuOpen)
+        {
+            isMenuOpen = false;
+            StateHasChanged();
+        }
+    }
+
     private static string GetInitials(string name)
     {
         var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -284,6 +297,22 @@ else
         if (sessionManager is not null)
         {
             sessionManager.SessionChanged -= HandleSessionChanged;
+        }
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        base.OnInitialized();
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (isMenuOpen)
+        {
+            isMenuOpen = false;
+            StateHasChanged();
         }
     }
 }
