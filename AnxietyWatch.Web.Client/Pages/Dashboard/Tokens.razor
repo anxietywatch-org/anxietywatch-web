@@ -56,7 +56,7 @@
             </section>
 
             <aside class="token-alert" role="note" aria-label="Información importante sobre tokens">
-                <span aria-hidden="true">!</span><p>@pendingTokenCount pendientes · @expiredTokenCount expirados · @acceptedTokenCount aceptados. La cuota cuenta todos los tokens que el backend no haya eliminado.</p>
+                <span aria-hidden="true">!</span><p>@pendingTokenCount pendientes · @expiredTokenCount expirados · @acceptedTokenCount aceptados. La cuota cuenta todos los tokens que el backend no haya eliminado.@if (quotaTokenCount > planLimit) { <text> Tu plan actual permite menos tokens de los que tienes activos. Elimina o revoca alguno para poder generar uno nuevo.</text> }</p>
             </aside>
 
             <section class="tokens-table-card" aria-labelledby="tokens-table-title">
@@ -64,7 +64,7 @@
                     <div><h2 id="tokens-table-title">Tokens del plan</h2><p>Códigos generados para vincular usuarios a tu plan.</p></div>
                     <div class="table-header__actions">
                         <button class="export-token-action" type="button" @onclick="ExportTokensAsync" disabled="@(isLoading || mutationInProgress || allTokens.Count == 0)">Exportar</button>
-                        <button class="new-token-action" type="button" @onclick="OpenTokenModal" disabled="@(isLoading || mutationInProgress)"><span aria-hidden="true">+</span>Nuevo token</button>
+                        <button class="new-token-action" type="button" title="@(isLimitReached ? "Alcanzaste el límite de tokens de tu plan actual" : null)" @onclick="OpenTokenModal" disabled="@(isLoading || mutationInProgress || isLimitReached)"><span aria-hidden="true">+</span>Nuevo token</button>
                     </div>
                 </header>
 
