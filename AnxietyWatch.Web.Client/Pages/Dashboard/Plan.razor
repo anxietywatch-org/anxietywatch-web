@@ -127,12 +127,16 @@
                 {
                     <section class="upgrade-benefits" aria-labelledby="upgrade-benefits-title">
                         <h3 id="upgrade-benefits-title">Vas a cambiar a Gratuito</h3>
-                        <p role="status">Esta función estará disponible pronto. Contáctanos para cambiar a Gratuito por ahora.</p>
+                        <p>No se te cobrará nada. Perderás el acceso a las funciones exclusivas de tu plan actual de inmediato.</p>
+                        @if (!string.IsNullOrWhiteSpace(changePlanMessage))
+                        {
+                            <p role="@(changePlanSucceeded ? "status" : "alert")">@changePlanMessage</p>
+                        }
                     </section>
 
                     <footer class="upgrade-modal__actions">
-                        <button class="upgrade-button upgrade-button--cancel" type="button" @onclick="ClosePlanModal">Volver</button>
-                        <button class="upgrade-button upgrade-button--confirm" type="button" disabled>Confirmar cambio</button>
+                        <button class="upgrade-button upgrade-button--cancel" type="button" @onclick="ClosePlanModal" disabled="@isChangingPlan">Volver</button>
+                        <button class="upgrade-button upgrade-button--confirm" type="button" @onclick="ConfirmFreeDowngradeAsync" disabled="@isChangingPlan">@(isChangingPlan ? "Procesando..." : "Confirmar cambio")</button>
                     </footer>
                 }
                 else
@@ -372,6 +376,37 @@
         catch
         {
             changePlanMessage = "No pudimos actualizar el plan. Inténtalo nuevamente.";
+        }
+        finally { isChangingPlan = false; }
+    }
+
+    private async Task ConfirmFreeDowngradeAsync()
+    {
+        if (selectedPlanChange is null || isChangingPlan) return;
+        isChangingPlan = true;
+        changePlanMessage = null;
+        changePlanSucceeded = false;
+        try
+        {
+            await BillingService.SimulatePaymentAsync(
+                new SimulatePaymentRequest(selectedPlanChange.Id, "monthly"));
+            await SessionManager.RefreshSessionAsync();
+            changePlanSucceeded = true;
+            changePlanMessage = "Tu plan se cambió a Gratuito.";
+            await LoadPlansAsync();
+        }
+        catch (ApiException exception) when (exception.StatusCode == 401)
+        {
+            await SessionManager.ClearAsync();
+            Navigation.NavigateTo("/login", replace: true);
+        }
+        catch (ApiException exception)
+        {
+            changePlanMessage = ApiErrorMessages.For(exception, "No pudimos cambiar tu plan a Gratuito.");
+        }
+        catch
+        {
+            changePlanMessage = "No pudimos cambiar tu plan a Gratuito. Inténtalo nuevamente.";
         }
         finally { isChangingPlan = false; }
     }
