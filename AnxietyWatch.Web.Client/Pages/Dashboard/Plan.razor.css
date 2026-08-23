@@ -585,6 +585,12 @@
     filter: brightness(0.96);
 }
 
+.upgrade-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    filter: none;
+}
+
 .upgrade-modal__close:focus-visible,
 .upgrade-button:focus-visible {
     outline: 3px solid var(--modal-border);
