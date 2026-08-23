@@ -103,6 +103,14 @@ Respondió HTTP 200. El cuerpo observado contiene:
 
 Respondió HTTP 200 con un arreglo de transacciones con la misma forma de `lastPayment`.
 
+### Cambio al plan Gratuito — contrato pendiente
+
+No hay evidencia autenticada de que `POST /api/billing/simulate-payment` acepte
+`planId = "free"` ni de que actualice la sesión y el resumen de facturación al plan Gratuito.
+Hasta que backend confirme ese contrato o proporcione una operación específica de downgrade,
+el frontend no envía esa solicitud: muestra el cambio a Gratuito sin campos de pago y mantiene
+la confirmación deshabilitada con una indicación para contactar al equipo.
+
 ## Cuota de tokens — implementación de master
 
 Master consulta `GET /api/tokens/quota` mediante `TokenService.GetQuotaAsync()` y usa:
@@ -145,3 +153,4 @@ La eliminación de un token `accepted` mediante `DELETE /api/tokens/{id}` devuel
 
 1. Endpoint seguro de disponibilidad de correo durante el primer paso del registro.
 2. Contrato para regenerar o refrescar un token.
+3. Contrato autenticado para cambiar una cuenta de pago al plan Gratuito.
