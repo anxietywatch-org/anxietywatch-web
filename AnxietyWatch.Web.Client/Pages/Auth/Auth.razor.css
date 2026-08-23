@@ -309,16 +309,6 @@
     transform: translateY(-2px);
 }
 
-.auth-plan-card.is-upcoming {
-    cursor: not-allowed;
-    filter: grayscale(0.18);
-    opacity: 0.68;
-}
-
-.auth-plan-card.is-upcoming:hover {
-    transform: none;
-}
-
 .plan-radio {
     position: absolute;
     top: 0.9rem;

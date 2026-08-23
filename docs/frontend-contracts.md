@@ -103,15 +103,26 @@ Respondió HTTP 200. El cuerpo observado contiene:
 
 Respondió HTTP 200 con un arreglo de transacciones con la misma forma de `lastPayment`.
 
-### Cambio al plan Gratuito
+### Cambio al plan Gratuito — rechazo confirmado
 
-El modal para bajar a Gratuito no pide tarjeta/vencimiento/CVV (no tiene sentido para un plan
-de $0), y el botón "Confirmar cambio" llama al mismo endpoint que los planes de pago:
-`POST /api/billing/simulate-payment` con `{ "planId": "free", "billingCycle": "monthly" }`,
-seguido de `GET /api/auth/session` para refrescar la sesión. Se decidió probarlo en vivo contra
-producción en vez de dejarlo bloqueado por falta de evidencia previa — si el backend rechaza el
-downgrade o no actualiza el plan, el mensaje de error real queda documentado aquí en cuanto se
-reproduzca.
+Una prueba autenticada desde una cuenta de pago envió:
+
+```json
+{
+  "planId": "free",
+  "billingCycle": "monthly"
+}
+```
+
+`POST /api/billing/simulate-payment` rechazó la operación con el mensaje exacto
+`The free plan does not require payment.`. La evidencia disponible no incluye todavía el status
+HTTP ni el cuerpo crudo completo; deben capturarse en una nueva prueba autenticada antes de
+documentarlos, sin inferirlos a partir del mensaje mostrado por el cliente.
+
+El endpoint de pago simulado no debe usarse para este downgrade. Backend necesita definir un
+mecanismo distinto para cambiar al plan Gratuito, ya sea otro parámetro, una operación propia o
+una actualización del plan de la cuenta. El frontend no presupone cuál será ese contrato y,
+mientras se define, no envía la solicitud y mantiene deshabilitada la confirmación.
 
 ## Cuota de tokens — implementación de master
 

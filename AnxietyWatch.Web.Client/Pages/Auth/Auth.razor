@@ -397,7 +397,7 @@
         : "register-step";
 
     private string GetPlanCardClass(PlanDto plan) =>
-        $"auth-plan-card plan-tone--{plan.Id}{(selectedPlanId == plan.Id ? " is-selected" : string.Empty)}{(!IsFreePlan(plan) ? " is-upcoming" : string.Empty)}";
+        $"auth-plan-card plan-tone--{plan.Id}{(selectedPlanId == plan.Id ? " is-selected" : string.Empty)}";
 
     private string GetSelectedPlanToneClass() => SelectedPlan is null ? string.Empty : $"plan-tone--{SelectedPlan.Id}";
 
