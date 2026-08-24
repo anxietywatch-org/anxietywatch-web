@@ -95,6 +95,10 @@
                                         <td>
                                             <div class="row-actions">
                                                 <button type="button" aria-label="Copiar token" title="Copiar" @onclick="() => CopyTokenAsync(token.Code)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg></button>
+                                                @if (CanRotate(token))
+                                                {
+                                                    <button type="button" aria-label="Regenerar token" title="Regenerar" @onclick="() => RotateTokenAsync(token)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m9.5-3A7 7 0 0 0 6 7m-.5 8A7 7 0 0 0 18 17" /></svg></button>
+                                                }
                                                 @if (HasStatus(token, "accepted"))
                                                 {
                                                     <button type="button" aria-label="Revocar token" title="Revocar" @onclick="() => RevokeTokenAsync(token)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 14.5 5-5M7 17l-1.5 1.5a3.5 3.5 0 0 1-5-5L5 9a3.5 3.5 0 0 1 5 0m7 6a3.5 3.5 0 0 0 5 0l1.5-1.5a3.5 3.5 0 0 0-5-5L14 13a3.5 3.5 0 0 0 0 5" /></svg></button>
@@ -130,16 +134,16 @@
             <section class="token-modal" role="dialog" aria-modal="true" aria-labelledby="token-modal-title" @onclick:stopPropagation="true">
                 <header class="token-modal__header">
                     <span class="token-modal__key" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="12" r="4" /><path d="M12 12h9m-3 0v3m-3-3v2" /></svg></span>
-                    <h2 id="token-modal-title">Nuevo token</h2>
+                    <h2 id="token-modal-title">@(isRotatedTokenResult ? "Token regenerado" : "Nuevo token")</h2>
                     <button type="button" aria-label="Cerrar modal" @onclick="CloseTokenModal" disabled="@isCreating">×</button>
                 </header>
                 <div class="token-usage-banner"><span>Cuota utilizada</span><strong>@quotaTokenCount de @planLimit</strong></div>
                 @if (generatedToken is not null)
                 {
                     <section class="generated-token" aria-labelledby="generated-token-title">
-                        <h3 id="generated-token-title">Token generado</h3>
-                        <div class="generated-token__field"><code>@generatedToken.Code</code><button type="button" @onclick="() => CopyTokenAsync(generatedToken.Code)" aria-label="Copiar token generado"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>Copiar</button></div>
-                        <p>Expira el @(generatedToken.ExpiresAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")).</p>
+                        <h3 id="generated-token-title">@(isRotatedTokenResult ? "Nuevo código vigente" : "Token generado")</h3>
+                        <div class="generated-token__field"><code>@generatedToken.Code</code><button type="button" @onclick="() => CopyTokenAsync(generatedToken.Code)" aria-label="Copiar código vigente"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>Copiar</button></div>
+                        <p>@(isRotatedTokenResult ? "El código anterior dejó de ser válido. " : string.Empty)Expira el @(generatedToken.ExpiresAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")).</p>
                     </section>
                 }
                 else if (isLimitReached)
@@ -203,7 +207,9 @@
     private bool isCreating;
     private bool isDeleting;
     private bool isRevoking;
+    private bool isRotating;
     private bool isExporting;
+    private bool isRotatedTokenResult;
     private int planLimit = 1;
     private int quotaTokenCount;
     private string selectedRole = "self";
@@ -218,7 +224,7 @@
     private int acceptedTokenCount => allTokens.Count(token => HasStatus(token, "accepted"));
     private int usagePercent => planLimit == 0 ? 0 : Math.Min(100, (int)Math.Round(quotaTokenCount * 100d / planLimit));
     private bool isLimitReached => quotaTokenCount >= planLimit;
-    private bool mutationInProgress => isCreating || isDeleting || isRevoking || isExporting;
+    private bool mutationInProgress => isCreating || isDeleting || isRevoking || isRotating || isExporting;
 
     protected override async Task OnInitializedAsync()
     {
@@ -366,6 +372,50 @@
         finally { isRevoking = false; }
     }
 
+    private async Task RotateTokenAsync(LinkTokenDto token)
+    {
+        if (isRotating || !CanRotate(token) || !Guid.TryParse(token.Id, out var id))
+        {
+            if (!Guid.TryParse(token.Id, out _)) SetPageMessage("El identificador del token no es válido.", true);
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "¿Regenerar este token? El código actual dejará de funcionar de inmediato.");
+        if (!confirmed) return;
+
+        isRotating = true;
+        SetPageMessage(null, false);
+        try
+        {
+            var rotatedToken = await TokenService.RotateTokenAsync(id);
+            var tokenIndex = allTokens.IndexOf(token);
+            if (tokenIndex >= 0)
+            {
+                allTokens[tokenIndex] = rotatedToken;
+            }
+            RefreshVisibleTokens();
+            generatedToken = rotatedToken;
+            isRotatedTokenResult = true;
+            modalMessage = null;
+            showTokenModal = true;
+        }
+        catch (ApiException exception) when (exception.StatusCode == 409)
+        {
+            await LoadTokensAsync();
+            SetPageMessage("Este token cambió de estado mientras tanto. La lista se actualizó con el estado real.", true);
+        }
+        catch (ApiException exception)
+        {
+            await HandleApiExceptionAsync(exception, "No pudimos regenerar el token.");
+        }
+        catch
+        {
+            await LoadTokensAsync();
+            SetPageMessage("No pudimos confirmar la regeneración. Actualizamos la lista; verifica el código vigente antes de intentarlo de nuevo.", true);
+        }
+        finally { isRotating = false; }
+    }
+
     private async Task ExportTokensAsync()
     {
         if (isExporting) return;
@@ -419,6 +469,7 @@
         EnsureSelectedRoleIsValid();
         showTokenModal = true;
         generatedToken = null;
+        isRotatedTokenResult = false;
         modalMessage = null;
     }
 
@@ -427,6 +478,7 @@
         if (isCreating) return;
         showTokenModal = false;
         generatedToken = null;
+        isRotatedTokenResult = false;
         modalMessage = null;
         if (NewTokenRequested) Navigation.NavigateTo("/dashboard/tokens", replace: true);
     }
@@ -435,6 +487,7 @@
     {
         selectedRole = role;
         generatedToken = null;
+        isRotatedTokenResult = false;
         modalMessage = null;
     }
 
@@ -490,6 +543,7 @@
     private static bool IsExpired(LinkTokenDto token) =>
         HasStatus(token, "expired") || IsVisuallyExpired(token);
     private static bool CanDelete(LinkTokenDto token) => HasStatus(token, "pending");
+    private static bool CanRotate(LinkTokenDto token) => HasStatus(token, "pending");
     private static string GetStatusLabel(LinkTokenDto token) => IsVisuallyExpired(token)
         ? "Expirado"
         : token.Status.ToLowerInvariant() switch { "accepted" => "Aceptado", "pending" => "Pendiente", "expired" => "Expirado", _ => token.Status };

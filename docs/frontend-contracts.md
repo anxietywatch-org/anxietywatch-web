@@ -103,26 +103,24 @@ Respondió HTTP 200. El cuerpo observado contiene:
 
 Respondió HTTP 200 con un arreglo de transacciones con la misma forma de `lastPayment`.
 
-### Cambio al plan Gratuito — rechazo confirmado
+### Cambio al plan Gratuito — disponible
 
-Una prueba autenticada desde una cuenta de pago envió:
+Backend expone `POST /api/billing/downgrade-to-free` como una operación autenticada, sin body y
+separada del pago simulado. Responde HTTP 200 con esta forma:
 
 ```json
 {
   "planId": "free",
-  "billingCycle": "monthly"
+  "previousPlanId": "professional",
+  "changed": true,
+  "downgradedAt": "2026-08-23T12:00:00Z"
 }
 ```
 
-`POST /api/billing/simulate-payment` rechazó la operación con el mensaje exacto
-`The free plan does not require payment.`. La evidencia disponible no incluye todavía el status
-HTTP ni el cuerpo crudo completo; deben capturarse en una nueva prueba autenticada antes de
-documentarlos, sin inferirlos a partir del mensaje mostrado por el cliente.
-
-El endpoint de pago simulado no debe usarse para este downgrade. Backend necesita definir un
-mecanismo distinto para cambiar al plan Gratuito, ya sea otro parámetro, una operación propia o
-una actualización del plan de la cuenta. El frontend no presupone cuál será ese contrato y,
-mientras se define, no envía la solicitud y mantiene deshabilitada la confirmación.
+La operación es idempotente: si la cuenta ya está en Gratuito responde `changed: false` sin
+error. El frontend consume este endpoint mediante `BillingService.DowngradeToFreeAsync()` y,
+tras el 200, refresca `GET /api/auth/session` antes de volver a cargar el catálogo y la tarjeta
+del plan activo. `POST /api/billing/simulate-payment` permanece reservado para planes pagos.
 
 ## Cuota de tokens — implementación de master
 
@@ -162,8 +160,25 @@ La eliminación de un token `accepted` mediante `DELETE /api/tokens/{id}` devuel
 }
 ```
 
+### Rotación de tokens pending — disponible
+
+Backend expone `POST /api/tokens/{id}/rotate` como una operación autenticada y sin body. Devuelve
+el `LinkTokenDto` vigente con el mismo `id`, `role` y slot de cuota, pero con `code` y
+`expiresAt` nuevos y status `pending`. El código anterior queda inválido de inmediato.
+
+La operación admite tokens `pending` aunque estén vencidos, pero rechaza tokens `accepted` o
+`deleted`. Es atómica frente a rotación, aceptación y eliminación concurrentes: solo una
+operación gana y las demás responden 409. Ante ese conflicto el frontend recarga
+`GET /api/tokens` y muestra el estado real.
+
+Si falla el transporte y no hay una respuesta HTTP concluyente, el frontend no repite el POST:
+primero recarga `GET /api/tokens` para recuperar el código vigente y deja cualquier nuevo intento
+a una acción manual del usuario.
+
 ## Solicitudes pendientes
 
-1. Endpoint seguro de disponibilidad de correo durante el primer paso del registro.
-2. Contrato para regenerar o refrescar un token.
-3. Contrato autenticado para cambiar una cuenta de pago al plan Gratuito.
+No quedan solicitudes pendientes de esta lista.
+
+Resueltos: disponibilidad de correo mediante `POST /api/auth/email-availability`, downgrade
+autenticado mediante `POST /api/billing/downgrade-to-free` y rotación de tokens mediante
+`POST /api/tokens/{id}/rotate`.

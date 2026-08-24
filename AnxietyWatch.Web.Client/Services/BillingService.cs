@@ -7,6 +7,7 @@ namespace AnxietyWatch.Web.Client.Services;
 public interface IBillingService
 {
     Task<SimulatedPaymentDto> SimulatePaymentAsync(SimulatePaymentRequest request, CancellationToken cancellationToken = default);
+    Task<DowngradeToFreeResponse> DowngradeToFreeAsync(CancellationToken cancellationToken = default);
     Task<BillingSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default);
 }
 
@@ -16,6 +17,12 @@ public sealed class BillingService(HttpClient http, JsonSerializerOptions jsonOp
     {
         using var response = await http.PostAsJsonAsync("api/billing/simulate-payment", request, jsonOptions, cancellationToken);
         return await response.ReadApiAsync<SimulatedPaymentDto>(jsonOptions, cancellationToken);
+    }
+
+    public async Task<DowngradeToFreeResponse> DowngradeToFreeAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await http.PostAsync("api/billing/downgrade-to-free", content: null, cancellationToken);
+        return await response.ReadApiAsync<DowngradeToFreeResponse>(jsonOptions, cancellationToken);
     }
 
     public async Task<BillingSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default)
