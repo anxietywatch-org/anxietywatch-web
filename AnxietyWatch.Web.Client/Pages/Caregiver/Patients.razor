@@ -1,0 +1,30 @@
+@page "/caregiver/patients"
+@layout DashboardLayout
+@using AnxietyWatch.Web.Client.Models.Api
+@inject ICaregiverService CaregiverService
+@inject NavigationManager Navigation
+
+<PageTitle>Personas vinculadas | AnxietyWatch</PageTitle>
+<section class="dashboard-page">
+    <header class="page-header"><div><h1>Personas vinculadas</h1><p>Consulta información compartida por tus vínculos aceptados.</p></div></header>
+    @if (loading) { <div class="table-state" role="status">Cargando personas vinculadas...</div> }
+    else if (error is not null) { <div class="auth-alert auth-alert--error" role="alert">@error <button type="button" @onclick="LoadAsync">Reintentar</button></div> }
+    else if (patients.Count == 0) { <div class="table-state"><strong>Aún no hay personas vinculadas.</strong><span>Cuando una relación sea aceptada aparecerá aquí.</span></div> }
+    else { <div class="tokens-layout">@foreach (var patient in patients) { <article class="metric-card"><div><h2>@patient.FullName</h2><span>Vínculo desde @patient.LinkedAt.ToLocalTime().ToString("d")</span></div><button class="new-token-action" @onclick="() => OpenPatient(patient.PatientId)">Ver detalle</button></article> }</div> }
+</section>
+
+@code {
+    private IReadOnlyList<CaregiverPatientDto> patients = [];
+    private bool loading = true;
+    private string? error;
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private void OpenPatient(string patientId) => Navigation.NavigateTo($"/caregiver/patients/{patientId}");
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { patients = await CaregiverService.GetPatientsAsync(); }
+        catch (ApiException ex) { error = ApiErrorMessages.For(ex, "No pudimos cargar tus personas vinculadas."); }
+        catch (Exception) { error = "No pudimos conectar con el servicio."; }
+        finally { loading = false; }
+    }
+}

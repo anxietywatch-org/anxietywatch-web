@@ -1,0 +1,67 @@
+@page "/caregiver/patients/{PatientId}"
+@layout DashboardLayout
+@using AnxietyWatch.Web.Client.Models.Api
+@inject ICaregiverService CaregiverService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Detalle de persona | AnxietyWatch</PageTitle>
+<section class="dashboard-page">
+    @if (loading) { <div class="table-state" role="status">Cargando información...</div> }
+    else if (accessDenied) { <div class="auth-alert auth-alert--error" role="alert">Ya no tienes acceso a esta persona.</div><button class="new-token-action" @onclick="BackToPatients">Volver a personas vinculadas</button> }
+    else if (error is not null) { <div class="auth-alert auth-alert--error" role="alert">@error</div><button class="new-token-action" @onclick="LoadAsync">Reintentar</button> }
+    else if (patient is not null)
+    {
+        <header class="page-header"><div><h1>@patient.FullName</h1><p>Información compartida por la relación vinculada.</p></div><button class="new-token-action" @onclick="BackToPatients">Volver</button></header>
+        <section class="metrics-grid" aria-label="Última frecuencia cardíaca">
+            <article class="metric-card"><div><span>Última frecuencia cardíaca</span>@if (heartRate is null) { <strong>Sin mediciones recientes</strong> } else { <strong>@heartRate.HeartRateBpm BPM</strong><small>Medida @heartRate.MeasuredAt.ToLocalTime().ToString("g") · @heartRate.Quality</small> }</div></article>
+        </section>
+        <div class="caregiver-detail-grid">
+            <section class="tokens-table-card"><header class="table-header"><div><h2>Episodios</h2><p>La información se muestra según la privacidad configurada.</p></div><select @bind="selectedRange" @bind:after="LoadEpisodesAsync"><option value="7">7 días</option><option value="30">30 días</option><option value="90">90 días</option></select></header>
+                @if (episodes.Count == 0) { <div class="table-state">No hay episodios en este período.</div> } else { @foreach (var episode in episodes) { <article class="caregiver-item"><strong>@episode.Date.ToLocalTime().ToString("g") · Intensidad @episode.Intensity</strong>@if (episode.DetailsHidden) { <span>Detalles ocultos por privacidad</span> } else { <span>@(episode.Symptoms ?? "Sin síntomas registrados")</span><span>@(episode.Notes ?? "Sin notas registradas")</span> }</article> } }
+            </section>
+            <section class="tokens-table-card"><header class="table-header"><div><h2>Eventos</h2><p>Actividad resumida, sin datos crudos ni interpretación clínica.</p></div></header>
+                @if (events.Count == 0) { <div class="table-state">No hay eventos recientes.</div> } else { @foreach (var item in events) { <article class="caregiver-item"><strong>@GetEventLabel(item)</strong><span>@item.OccurredAt.ToLocalTime().ToString("g") · @item.Status</span></article> } }
+            </section>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public string PatientId { get; set; } = string.Empty;
+    private CaregiverPatientDetailDto? patient;
+    private IReadOnlyList<CaregiverEpisodeDto> episodes = [];
+    private IReadOnlyList<CaregiverEventDto> events = [];
+    private LatestHeartRateDto? heartRate;
+    private CancellationTokenSource? loadCancellation;
+    private int selectedRange = 7;
+    private bool loading = true;
+    private bool accessDenied;
+    private string? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loadCancellation?.Cancel(); loadCancellation?.Dispose(); loadCancellation = new();
+        var token = loadCancellation.Token; loading = true; error = null; accessDenied = false;
+        try
+        {
+            patient = await CaregiverService.GetPatientAsync(PatientId, token);
+            await Task.WhenAll(LoadEpisodesAsync(token), LoadEventsAsync(token), LoadHeartRateAsync(token));
+        }
+        catch (ApiException ex) when (ex.StatusCode is 401 or 403)
+        { accessDenied = true; patient = null; episodes = []; events = []; heartRate = null; }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (ApiException ex) { error = ApiErrorMessages.For(ex, "No pudimos cargar el detalle."); }
+        catch (Exception) { error = "No pudimos conectar con el servicio."; }
+        finally { if (!token.IsCancellationRequested) loading = false; }
+    }
+
+    private async Task LoadEpisodesAsync() => await LoadEpisodesAsync(loadCancellation?.Token ?? CancellationToken.None);
+    private async Task LoadEpisodesAsync(CancellationToken token) { episodes = await CaregiverService.GetEpisodesAsync(PatientId, selectedRange, token); }
+    private async Task LoadEventsAsync(CancellationToken token) { events = await CaregiverService.GetEventsAsync(PatientId, cancellationToken: token); }
+    private async Task LoadHeartRateAsync(CancellationToken token) { heartRate = await CaregiverService.GetLatestHeartRateAsync(PatientId, token); }
+    private void BackToPatients() => Navigation.NavigateTo("/caregiver/patients");
+    private static string GetEventLabel(CaregiverEventDto item) => item.Type.Equals("SOS", StringComparison.OrdinalIgnoreCase) ? "SOS" : item.Type.Equals("SUPPORT_REQUESTED", StringComparison.OrdinalIgnoreCase) ? "Solicitud de apoyo" : item.Type;
+    public void Dispose() { loadCancellation?.Cancel(); loadCancellation?.Dispose(); }
+}

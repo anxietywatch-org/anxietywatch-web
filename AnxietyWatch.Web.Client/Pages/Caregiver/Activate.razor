@@ -1,0 +1,43 @@
+@page "/caregiver/activate"
+@using System.ComponentModel.DataAnnotations
+@using AnxietyWatch.Web.Client.Models.Api
+@inject ICaregiverService CaregiverService
+@inject IAuthSessionManager SessionManager
+@inject NavigationManager Navigation
+
+<PageTitle>Activar cuenta de cuidador | AnxietyWatch</PageTitle>
+<section class="auth-shell"><div class="auth-card">
+    <header class="auth-heading"><h1>Activa tu cuenta</h1><p>Define el correo y la contraseña que usarás para iniciar sesión.</p></header>
+    @if (!string.IsNullOrWhiteSpace(error)) { <div class="auth-alert auth-alert--error" role="alert">@error</div> }
+    <EditForm Model="model" OnValidSubmit="ActivateAsync" class="auth-form">
+        <DataAnnotationsValidator />
+        <div class="auth-field"><label for="caregiver-email">Correo electrónico</label><InputText id="caregiver-email" class="form-input" type="email" @bind-Value="model.Email" autocomplete="email" /><ValidationMessage For="@(() => model.Email)" /></div>
+        <div class="auth-field"><label for="caregiver-password">Contraseña</label><InputText id="caregiver-password" class="form-input" type="password" @bind-Value="model.Password" autocomplete="new-password" /><ValidationMessage For="@(() => model.Password)" /></div>
+        <button class="auth-primary auth-primary--sage" type="submit" disabled="@busy">@(busy ? "Activando..." : "Activar cuenta")</button>
+    </EditForm>
+</div></section>
+
+@code {
+    private readonly CaregiverActivationRequest model = new();
+    private bool busy;
+    private string? error;
+
+    protected override void OnInitialized()
+    {
+        if (!SessionManager.IsAuthenticated) Navigation.NavigateTo("/caregiver/redeem", replace: true);
+    }
+
+    private async Task ActivateAsync()
+    {
+        busy = true; error = null;
+        try
+        {
+            var session = await CaregiverService.ActivateAsync(model);
+            await SessionManager.SetSessionAsync(session);
+            Navigation.NavigateTo("/caregiver/patients", replace: true);
+        }
+        catch (ApiException ex) { error = ApiErrorMessages.For(ex, "No pudimos activar la cuenta."); }
+        catch (Exception) { error = "No pudimos conectar con el servicio. Inténtalo nuevamente."; }
+        finally { busy = false; }
+    }
+}
