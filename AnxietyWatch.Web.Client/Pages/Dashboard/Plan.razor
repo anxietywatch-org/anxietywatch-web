@@ -123,96 +123,115 @@
                             @onclick="ClosePlanModal">×</button>
                 </header>
 
-                <div class="plan-comparison" aria-label="Comparación de planes">
-                    @if (currentPlan is not null)
-                    {
-                        <article class="comparison-card comparison-card--current">
-                            <span class="comparison-label">Plan actual</span>
-                            <strong class="comparison-badge comparison-badge--current">@currentPlan.Name</strong>
-                            <p><strong>@FormatPrice(GetPlanPrice(currentPlan))</strong><span>/@BillingCycleLabel</span></p>
+                @if (IsFreePlan(selectedPlanChange))
+                {
+                    <section class="upgrade-benefits" aria-labelledby="upgrade-benefits-title">
+                        <h3 id="upgrade-benefits-title">Vas a cambiar a Gratuito</h3>
+                        <p>No se te cobrará nada. Perderás el acceso a las funciones exclusivas de tu plan actual de inmediato.</p>
+                        @if (!string.IsNullOrWhiteSpace(changePlanMessage))
+                        {
+                            <p role="@(changePlanSucceeded ? "status" : "alert")">@changePlanMessage</p>
+                        }
+                    </section>
+
+                    <footer class="upgrade-modal__actions">
+                        <button class="upgrade-button upgrade-button--cancel" type="button" @onclick="ClosePlanModal" disabled="@isChangingPlan">Volver</button>
+                        <button class="upgrade-button upgrade-button--confirm" type="button" @onclick="ConfirmFreeDowngradeAsync" disabled="@isChangingPlan">@(isChangingPlan ? "Procesando..." : "Confirmar cambio")</button>
+                    </footer>
+                }
+                else
+                {
+                    <div class="plan-comparison" aria-label="Comparación de planes">
+                        @if (currentPlan is not null)
+                        {
+                            <article class="comparison-card comparison-card--current">
+                                <span class="comparison-label">Plan actual</span>
+                                <strong class="comparison-badge comparison-badge--current">@currentPlan.Name</strong>
+                                <p><strong>@FormatPrice(GetPlanPrice(currentPlan))</strong><span>/@BillingCycleLabel</span></p>
+                            </article>
+
+                            <span class="comparison-arrow" aria-hidden="true">→</span>
+                        }
+
+                        <article class="comparison-card comparison-card--new">
+                            <span class="comparison-label comparison-label--accent">Plan consultado</span>
+                            <strong class="comparison-badge comparison-badge--new">@selectedPlanChange.Name</strong>
+                            <p><strong>@FormatPrice(SelectedPlanPrice)</strong><span>/@BillingCycleLabel</span></p>
                         </article>
-
-                        <span class="comparison-arrow" aria-hidden="true">→</span>
-                    }
-
-                    <article class="comparison-card comparison-card--new">
-                        <span class="comparison-label comparison-label--accent">Plan consultado</span>
-                        <strong class="comparison-badge comparison-badge--new">@selectedPlanChange.Name</strong>
-                        <p><strong>@FormatPrice(SelectedPlanPrice)</strong><span>/@BillingCycleLabel</span></p>
-                    </article>
-                </div>
-
-                <section class="upgrade-benefits" aria-labelledby="upgrade-benefits-title">
-                    <h3 id="upgrade-benefits-title">Resumen de tu compra</h3>
-                    <ul class="modal-benefits">
-                        @foreach (var feature in selectedPlanChange.Features)
-                        {
-                            <li><span aria-hidden="true">✓</span>@feature</li>
-                        }
-                    </ul>
-                    <label for="billing-cycle">Ciclo de facturación</label>
-                    <select id="billing-cycle" @bind="billingCycle" disabled="@isChangingPlan">
-                        <option value="monthly">Mensual</option>
-                        <option value="yearly">Anual</option>
-                    </select>
-                    <div class="checkout-total" aria-live="polite">
-                        <span>Total de hoy</span>
-                        <strong>@FormatPrice(SelectedPlanPrice) MXN</strong>
-                        <small>@(billingCycle == "yearly" ? "Cobertura de 12 meses" : "Cobro mensual simulado")</small>
                     </div>
-                    <div class="payment-methods" aria-label="Métodos de pago disponibles">
-                        <span class="payment-method payment-method--visa">VISA</span>
-                        <span class="payment-method payment-method--mastercard">●● Mastercard</span>
-                        <span class="payment-method payment-method--paypal">PayPal</span>
-                        <span class="payment-method payment-method--kueski">Kueski</span>
-                    </div>
-                    <div class="payment-fields">
-                        <label for="plan-card-number">Número de tarjeta de prueba</label>
-                        <input id="plan-card-number" type="text" inputmode="numeric" autocomplete="off" maxlength="19"
-                               placeholder="4242 4242 4242 4242" value="@demoCardNumber" @oninput="HandleCardNumberInput"
-                               aria-invalid="@(ShowCardError ? "true" : "false")" disabled="@isChangingPlan" />
-                        @if (!string.IsNullOrWhiteSpace(DetectedCardBrand))
-                        {
-                            <small class="detected-brand">Detectada: @DetectedCardBrand</small>
-                        }
-                        @if (ShowCardError)
-                        {
-                            <small class="payment-field-error" role="alert">@CardError</small>
-                        }
-                        <div class="payment-field-row">
-                            <div>
-                                <label for="plan-card-expiry">Vencimiento</label>
-                                <input id="plan-card-expiry" type="text" inputmode="numeric" autocomplete="off" maxlength="5"
-                                       placeholder="MM/AA" value="@demoExpiry" @oninput="HandleExpiryInput"
-                                       aria-invalid="@(ShowExpiryError ? "true" : "false")" disabled="@isChangingPlan" />
-                                @if (ShowExpiryError)
-                                {
-                                    <small class="payment-field-error" role="alert">@ExpiryError</small>
-                                }
-                            </div>
-                            <div>
-                                <label for="plan-card-cvv">CVV</label>
-                                <input id="plan-card-cvv" type="password" inputmode="numeric" autocomplete="off" maxlength="4"
-                                       placeholder="123" value="@demoCvv" @oninput="HandleCvvInput"
-                                       aria-invalid="@(ShowCvvError ? "true" : "false")" disabled="@isChangingPlan" />
-                                @if (ShowCvvError)
-                                {
-                                    <small class="payment-field-error" role="alert">@CvvError</small>
-                                }
+
+                    <section class="upgrade-benefits" aria-labelledby="upgrade-benefits-title">
+                        <h3 id="upgrade-benefits-title">Resumen de tu compra</h3>
+                        <ul class="modal-benefits">
+                            @foreach (var feature in selectedPlanChange.Features)
+                            {
+                                <li><span aria-hidden="true">✓</span>@feature</li>
+                            }
+                        </ul>
+                        <label for="billing-cycle">Ciclo de facturación</label>
+                        <select id="billing-cycle" @bind="billingCycle" disabled="@isChangingPlan">
+                            <option value="monthly">Mensual</option>
+                            <option value="yearly">Anual</option>
+                        </select>
+                        <div class="checkout-total" aria-live="polite">
+                            <span>Total de hoy</span>
+                            <strong>@FormatPrice(SelectedPlanPrice) MXN</strong>
+                            <small>@(billingCycle == "yearly" ? "Cobertura de 12 meses" : "Cobro mensual simulado")</small>
+                        </div>
+                        <div class="payment-methods" aria-label="Métodos de pago disponibles">
+                            <span class="payment-method payment-method--visa">VISA</span>
+                            <span class="payment-method payment-method--mastercard">●● Mastercard</span>
+                            <span class="payment-method payment-method--paypal">PayPal</span>
+                            <span class="payment-method payment-method--kueski">Kueski</span>
+                        </div>
+                        <div class="payment-fields">
+                            <label for="plan-card-number">Número de tarjeta de prueba</label>
+                            <input id="plan-card-number" type="text" inputmode="numeric" autocomplete="off" maxlength="19"
+                                   placeholder="4242 4242 4242 4242" value="@demoCardNumber" @oninput="HandleCardNumberInput"
+                                   aria-invalid="@(ShowCardError ? "true" : "false")" disabled="@isChangingPlan" />
+                            @if (!string.IsNullOrWhiteSpace(DetectedCardBrand))
+                            {
+                                <small class="detected-brand">Detectada: @DetectedCardBrand</small>
+                            }
+                            @if (ShowCardError)
+                            {
+                                <small class="payment-field-error" role="alert">@CardError</small>
+                            }
+                            <div class="payment-field-row">
+                                <div>
+                                    <label for="plan-card-expiry">Vencimiento</label>
+                                    <input id="plan-card-expiry" type="text" inputmode="numeric" autocomplete="off" maxlength="5"
+                                           placeholder="MM/AA" value="@demoExpiry" @oninput="HandleExpiryInput"
+                                           aria-invalid="@(ShowExpiryError ? "true" : "false")" disabled="@isChangingPlan" />
+                                    @if (ShowExpiryError)
+                                    {
+                                        <small class="payment-field-error" role="alert">@ExpiryError</small>
+                                    }
+                                </div>
+                                <div>
+                                    <label for="plan-card-cvv">CVV</label>
+                                    <input id="plan-card-cvv" type="password" inputmode="numeric" autocomplete="off" maxlength="4"
+                                           placeholder="123" value="@demoCvv" @oninput="HandleCvvInput"
+                                           aria-invalid="@(ShowCvvError ? "true" : "false")" disabled="@isChangingPlan" />
+                                    @if (ShowCvvError)
+                                    {
+                                        <small class="payment-field-error" role="alert">@CvvError</small>
+                                    }
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <p class="checkout-security">Pago de demostración: estos datos solo viven en memoria y nunca se envían ni se guardan.</p>
-                    @if (!string.IsNullOrWhiteSpace(changePlanMessage))
-                    {
-                        <p role="@(changePlanSucceeded ? "status" : "alert")">@changePlanMessage</p>
-                    }
-                </section>
+                        <p class="checkout-security">Pago de demostración: estos datos solo viven en memoria y nunca se envían ni se guardan.</p>
+                        @if (!string.IsNullOrWhiteSpace(changePlanMessage))
+                        {
+                            <p role="@(changePlanSucceeded ? "status" : "alert")">@changePlanMessage</p>
+                        }
+                    </section>
 
-                <footer class="upgrade-modal__actions">
-                    <button class="upgrade-button upgrade-button--cancel" type="button" @onclick="ClosePlanModal" disabled="@isChangingPlan">Volver</button>
-                    <button class="upgrade-button upgrade-button--confirm" type="button" @onclick="SimulatePaymentAsync" disabled="@isChangingPlan">@(isChangingPlan ? "Procesando..." : "Confirmar pago simulado")</button>
-                </footer>
+                    <footer class="upgrade-modal__actions">
+                        <button class="upgrade-button upgrade-button--cancel" type="button" @onclick="ClosePlanModal" disabled="@isChangingPlan">Volver</button>
+                        <button class="upgrade-button upgrade-button--confirm" type="button" @onclick="SimulatePaymentAsync" disabled="@isChangingPlan">@(isChangingPlan ? "Procesando..." : "Confirmar pago simulado")</button>
+                    </footer>
+                }
             </section>
         </div>
     }
@@ -304,6 +323,9 @@
     private static string FormatPrice(decimal price) =>
         $"${price.ToString("0.00", CultureInfo.InvariantCulture)}";
 
+    private static bool IsFreePlan(PlanDto plan) =>
+        plan.Id.Equals("free", StringComparison.OrdinalIgnoreCase) && plan.PriceMonthly == 0 && plan.PriceYearly == 0;
+
     private void OpenPlanModal(PlanDto plan)
     {
         selectedPlanChange = plan;
@@ -354,6 +376,43 @@
         catch
         {
             changePlanMessage = "No pudimos actualizar el plan. Inténtalo nuevamente.";
+        }
+        finally { isChangingPlan = false; }
+    }
+
+    private async Task ConfirmFreeDowngradeAsync()
+    {
+        if (isChangingPlan || selectedPlanChange is null) return;
+
+        isChangingPlan = true;
+        changePlanMessage = null;
+        changePlanSucceeded = false;
+        try
+        {
+            var result = await BillingService.DowngradeToFreeAsync(cancellationTokenSource.Token);
+            await SessionManager.RefreshSessionAsync(cancellationTokenSource.Token);
+            changePlanSucceeded = true;
+            changePlanMessage = result.Changed
+                ? "Tu plan se cambió a Gratuito."
+                : "Ya tienes el plan Gratuito.";
+            await LoadPlansAsync();
+            selectedPlanChange = plans.FirstOrDefault(IsFreePlan);
+        }
+        catch (ApiException exception) when (exception.StatusCode == 401)
+        {
+            await SessionManager.ClearAsync();
+            Navigation.NavigateTo("/login", replace: true);
+        }
+        catch (ApiException exception)
+        {
+            changePlanMessage = ApiErrorMessages.For(exception, "No pudimos cambiar tu plan a Gratuito.");
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        catch
+        {
+            changePlanMessage = "No pudimos cambiar tu plan a Gratuito. Inténtalo nuevamente.";
         }
         finally { isChangingPlan = false; }
     }

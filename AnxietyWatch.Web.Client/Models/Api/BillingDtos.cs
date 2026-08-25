@@ -28,6 +28,14 @@ public sealed class BillingSummaryDto
     [JsonPropertyName("simulated")] public bool Simulated { get; init; }
 }
 
+public sealed class DowngradeToFreeResponse
+{
+    [JsonPropertyName("planId")] public string PlanId { get; init; } = string.Empty;
+    [JsonPropertyName("previousPlanId")] public string PreviousPlanId { get; init; } = string.Empty;
+    [JsonPropertyName("changed")] public bool Changed { get; init; }
+    [JsonPropertyName("downgradedAt")] public DateTimeOffset? DowngradedAt { get; init; }
+}
+
 public sealed class TokenQuotaDto
 {
     [JsonPropertyName("limit")] public int Limit { get; init; }

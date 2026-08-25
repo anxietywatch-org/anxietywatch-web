@@ -215,7 +215,7 @@
                             <ValidationMessage For="@(() => registerModel.Password)" />
                         </div>
 
-                        <button class="auth-primary auth-primary--sage" type="submit">Continuar</button>
+                        <button class="auth-primary auth-primary--sage" type="submit" disabled="@isCheckingEmail">@(isCheckingEmail ? "Comprobando disponibilidad..." : "Continuar")</button>
                     </EditForm>
                 </div>
             }
@@ -332,6 +332,7 @@
     private bool showLoginPassword;
     private bool showRegisterPassword;
     private bool isSubmitting;
+    private bool isCheckingEmail;
     private string? authError;
     private string? registerEmailError;
     private IReadOnlyList<PlanDto> plans = [];
@@ -372,9 +373,37 @@
         Navigation.NavigateTo("/register", replace: true);
     }
 
-    private void ContinueToPlan()
+    private async Task ContinueToPlan()
     {
+        if (isCheckingEmail) return;
+
+        isCheckingEmail = true;
         authError = null;
+        registerEmailError = null;
+        try
+        {
+            var availability = await AuthService.CheckEmailAvailabilityAsync(
+                registerModel.Email,
+                cancellationTokenSource.Token);
+            if (!availability.Available)
+            {
+                registerEmailError = "Este correo ya tiene una cuenta. Inicia sesión o usa otro correo.";
+                return;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationTokenSource.IsCancellationRequested)
+        {
+            return;
+        }
+        catch
+        {
+            // La disponibilidad es orientativa; register conserva la validación autoritativa.
+        }
+        finally
+        {
+            isCheckingEmail = false;
+        }
+
         registerStep = 2;
     }
 
@@ -397,7 +426,7 @@
         : "register-step";
 
     private string GetPlanCardClass(PlanDto plan) =>
-        $"auth-plan-card plan-tone--{plan.Id}{(selectedPlanId == plan.Id ? " is-selected" : string.Empty)}{(!IsFreePlan(plan) ? " is-upcoming" : string.Empty)}";
+        $"auth-plan-card plan-tone--{plan.Id}{(selectedPlanId == plan.Id ? " is-selected" : string.Empty)}";
 
     private string GetSelectedPlanToneClass() => SelectedPlan is null ? string.Empty : $"plan-tone--{SelectedPlan.Id}";
 

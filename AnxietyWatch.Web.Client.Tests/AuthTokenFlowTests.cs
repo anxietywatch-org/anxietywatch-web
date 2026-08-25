@@ -153,6 +153,11 @@ public sealed class AuthTokenFlowTests
             return Task.FromResult(new AuthMessageResponse { Message = "ok" });
         }
 
+        public Task<EmailAvailabilityResponse> CheckEmailAvailabilityAsync(
+            string email,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new EmailAvailabilityResponse { Available = true });
+
         public Task<AuthMessageResponse> ConfirmEmailVerificationAsync(
             EmailVerificationConfirmRequest request,
             CancellationToken cancellationToken = default)

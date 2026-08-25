@@ -9,6 +9,7 @@ public interface ITokenService
     Task<IReadOnlyList<LinkTokenDto>> GetTokensAsync(CancellationToken cancellationToken = default);
     Task<TokenQuotaDto> GetQuotaAsync(CancellationToken cancellationToken = default);
     Task<LinkTokenDto> CreateTokenAsync(CreateTokenRequest request, CancellationToken cancellationToken = default);
+    Task<LinkTokenDto> RotateTokenAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SuccessResponse> DeleteTokenAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SuccessResponse> RevokeTokenAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SentResponse> ShareTokenAsync(Guid id, ShareTokenRequest request, CancellationToken cancellationToken = default);
@@ -34,6 +35,12 @@ public sealed class TokenService(HttpClient http, JsonSerializerOptions jsonOpti
         CancellationToken cancellationToken = default)
     {
         using var response = await http.PostAsJsonAsync("api/tokens", request, jsonOptions, cancellationToken);
+        return await response.ReadApiAsync<LinkTokenDto>(jsonOptions, cancellationToken);
+    }
+
+    public async Task<LinkTokenDto> RotateTokenAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.PostAsync($"api/tokens/{id:D}/rotate", content: null, cancellationToken);
         return await response.ReadApiAsync<LinkTokenDto>(jsonOptions, cancellationToken);
     }
 

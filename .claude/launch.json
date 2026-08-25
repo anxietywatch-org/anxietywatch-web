@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "anxietywatch-web",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "AnxietyWatch.Web", "--launch-profile", "http"],
+      "port": 5222
+    }
+  ]
+}

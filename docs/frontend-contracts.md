@@ -103,6 +103,25 @@ Respondió HTTP 200. El cuerpo observado contiene:
 
 Respondió HTTP 200 con un arreglo de transacciones con la misma forma de `lastPayment`.
 
+### Cambio al plan Gratuito — disponible
+
+Backend expone `POST /api/billing/downgrade-to-free` como una operación autenticada, sin body y
+separada del pago simulado. Responde HTTP 200 con esta forma:
+
+```json
+{
+  "planId": "free",
+  "previousPlanId": "professional",
+  "changed": true,
+  "downgradedAt": "2026-08-23T12:00:00Z"
+}
+```
+
+La operación es idempotente: si la cuenta ya está en Gratuito responde `changed: false` sin
+error. El frontend consume este endpoint mediante `BillingService.DowngradeToFreeAsync()` y,
+tras el 200, refresca `GET /api/auth/session` antes de volver a cargar el catálogo y la tarjeta
+del plan activo. `POST /api/billing/simulate-payment` permanece reservado para planes pagos.
+
 ## Cuota de tokens — implementación de master
 
 Master consulta `GET /api/tokens/quota` mediante `TokenService.GetQuotaAsync()` y usa:
@@ -141,7 +160,25 @@ La eliminación de un token `accepted` mediante `DELETE /api/tokens/{id}` devuel
 }
 ```
 
+### Rotación de tokens pending — disponible
+
+Backend expone `POST /api/tokens/{id}/rotate` como una operación autenticada y sin body. Devuelve
+el `LinkTokenDto` vigente con el mismo `id`, `role` y slot de cuota, pero con `code` y
+`expiresAt` nuevos y status `pending`. El código anterior queda inválido de inmediato.
+
+La operación admite tokens `pending` aunque estén vencidos, pero rechaza tokens `accepted` o
+`deleted`. Es atómica frente a rotación, aceptación y eliminación concurrentes: solo una
+operación gana y las demás responden 409. Ante ese conflicto el frontend recarga
+`GET /api/tokens` y muestra el estado real.
+
+Si falla el transporte y no hay una respuesta HTTP concluyente, el frontend no repite el POST:
+primero recarga `GET /api/tokens` para recuperar el código vigente y deja cualquier nuevo intento
+a una acción manual del usuario.
+
 ## Solicitudes pendientes
 
-1. Endpoint seguro de disponibilidad de correo durante el primer paso del registro.
-2. Contrato para regenerar o refrescar un token.
+No quedan solicitudes pendientes de esta lista.
+
+Resueltos: disponibilidad de correo mediante `POST /api/auth/email-availability`, downgrade
+autenticado mediante `POST /api/billing/downgrade-to-free` y rotación de tokens mediante
+`POST /api/tokens/{id}/rotate`.
