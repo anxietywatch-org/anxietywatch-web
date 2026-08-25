@@ -59,16 +59,9 @@ public class TokenStore : ITokenStore
         _expiresAt = null;
         _user = null;
 
-        try
-        {
-            await _js.InvokeVoidAsync("localStorage.removeItem", TokenKey);
-            await _js.InvokeVoidAsync("localStorage.removeItem", ExpiresKey);
-            await _js.InvokeVoidAsync("localStorage.removeItem", UserKey);
-        }
-        catch
-        {
-            // Sin interop: se limpia al menos en memoria.
-        }
+        await RemovePersistedValueAsync(TokenKey);
+        await RemovePersistedValueAsync(ExpiresKey);
+        await RemovePersistedValueAsync(UserKey);
     }
 
     public string? GetAccessToken() => _token;
@@ -116,4 +109,16 @@ public class TokenStore : ITokenStore
 
     private Task PersistAsync(string method, string key, string value) =>
         _js.InvokeVoidAsync(method, key, value).AsTask();
+
+    private async Task RemovePersistedValueAsync(string key)
+    {
+        try
+        {
+            await _js.InvokeVoidAsync("localStorage.removeItem", key);
+        }
+        catch
+        {
+            // Cada clave es best-effort; un fallo no impide limpiar las restantes.
+        }
+    }
 }

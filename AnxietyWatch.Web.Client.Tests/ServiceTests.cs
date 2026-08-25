@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using AnxietyWatch.Web.Client.Models.Api;
@@ -121,10 +122,286 @@ public sealed class ServiceTests
         Assert.Equal(409, exception.StatusCode);
     }
 
+    [Fact]
+    public async Task ForgotPasswordAsync_ReturnsMessage()
+    {
+        var service = CreateAuthService((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/api/auth/password/forgot", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"message\":\"Recovery email sent\"}");
+        });
+
+        var result = await service.ForgotPasswordAsync(new ForgotPasswordRequest { Email = "user@example.test" });
+
+        Assert.Equal("Recovery email sent", result.Message);
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_RateLimitedThrows429()
+    {
+        var service = CreateAuthService((_, _) => Json(HttpStatusCode.TooManyRequests, ProblemJson(429)));
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            service.ForgotPasswordAsync(new ForgotPasswordRequest { Email = "user@example.test" }));
+
+        Assert.Equal(429, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_ReturnsMessage()
+    {
+        var service = CreateAuthService((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/api/auth/password/reset", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"message\":\"Password reset\"}");
+        });
+
+        var result = await service.ResetPasswordAsync(new ResetPasswordRequest
+        {
+            Token = "reset-token",
+            NewPassword = "NewPassword123!"
+        });
+
+        Assert.Equal("Password reset", result.Message);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_ExpiredTokenThrows410()
+    {
+        var service = CreateAuthService((_, _) => Json(HttpStatusCode.Gone, ProblemJson(410)));
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            service.ResetPasswordAsync(new ResetPasswordRequest { Token = "expired", NewPassword = "NewPassword123!" }));
+
+        Assert.Equal(410, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSettingsAsync_ReturnsSettings()
+    {
+        var service = new ProfileService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Equal("/api/settings", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"anxietyThreshold\":7,\"pushNotifications\":true,\"privateMode\":false}");
+        }), JsonOptions);
+
+        var result = await service.GetSettingsAsync();
+
+        Assert.Equal(7, result.AnxietyThreshold);
+        Assert.True(result.PushNotifications);
+        Assert.False(result.PrivateMode);
+    }
+
+    [Fact]
+    public async Task GetSettingsAsync_UnauthorizedThrows401()
+    {
+        var service = new ProfileService(CreateClient((_, _) => Json(HttpStatusCode.Unauthorized, ProblemJson(401))), JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => service.GetSettingsAsync());
+
+        Assert.Equal(401, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateSettingsAsync_ReturnsUpdatedSettings()
+    {
+        var service = new ProfileService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Patch, request.Method);
+            Assert.Equal("/api/settings", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"anxietyThreshold\":9,\"pushNotifications\":false,\"privateMode\":true}");
+        }), JsonOptions);
+
+        var result = await service.UpdateSettingsAsync(new UpdateSettingsRequest
+        {
+            AnxietyThreshold = 9,
+            PushNotifications = false,
+            PrivateMode = true
+        });
+
+        Assert.Equal(9, result.AnxietyThreshold);
+        Assert.False(result.PushNotifications);
+        Assert.True(result.PrivateMode);
+    }
+
+    [Fact]
+    public async Task UpdateSettingsAsync_InvalidRequestThrows400()
+    {
+        var service = new ProfileService(CreateClient((_, _) => Json(HttpStatusCode.BadRequest, ProblemJson(400))), JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            service.UpdateSettingsAsync(new UpdateSettingsRequest { AnxietyThreshold = -1 }));
+
+        Assert.Equal(400, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_ReturnsDashboardSummary()
+    {
+        var service = new DashboardService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Equal("/api/dashboard/summary", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"anxietyLevel\":{\"current\":42,\"trend\":\"down\"},\"weeklyRecords\":{\"used\":3,\"limit\":7},\"streakDays\":5,\"exercisesCompleted\":12}");
+        }), JsonOptions);
+
+        var result = await service.GetSummaryAsync();
+
+        Assert.Equal(42, result.AnxietyLevel.Current);
+        Assert.Equal("down", result.AnxietyLevel.Trend);
+        Assert.Equal(3, result.WeeklyRecords.Used);
+        Assert.Equal(7, result.WeeklyRecords.Limit);
+        Assert.Equal(5, result.StreakDays);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_UnauthorizedThrows401()
+    {
+        var service = new DashboardService(CreateClient((_, _) => Json(HttpStatusCode.Unauthorized, ProblemJson(401))), JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => service.GetSummaryAsync());
+
+        Assert.Equal(401, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetQuotaAsync_ReturnsQuota()
+    {
+        var service = new TokenService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Equal("/api/tokens/quota", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"limit\":5,\"used\":2,\"remaining\":3}");
+        }), JsonOptions);
+
+        var result = await service.GetQuotaAsync();
+
+        Assert.Equal(5, result.Limit);
+        Assert.Equal(2, result.Used);
+        Assert.Equal(3, result.Remaining);
+    }
+
+    [Fact]
+    public async Task GetQuotaAsync_UnauthorizedThrows401()
+    {
+        var service = new TokenService(CreateClient((_, _) => Json(HttpStatusCode.Unauthorized, ProblemJson(401))), JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => service.GetQuotaAsync());
+
+        Assert.Equal(401, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExportTokensAsync_ReturnsFileMetadataAndContent()
+    {
+        var expected = Encoding.UTF8.GetBytes("code,status\nABC,pending");
+        var service = new TokenService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Equal("/api/tokens/export", request.RequestUri!.PathAndQuery);
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(expected)
+            };
+            response.Content.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+            response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileName = "tokens.csv" };
+            return response;
+        }), JsonOptions);
+
+        var result = await service.ExportTokensAsync();
+
+        Assert.Equal(expected, result.Content);
+        Assert.Equal("tokens.csv", result.FileName);
+        Assert.Equal("text/csv", result.ContentType);
+    }
+
+    [Fact]
+    public async Task ExportTokensAsync_UnauthorizedThrows401()
+    {
+        var service = new TokenService(CreateClient((_, _) => Json(HttpStatusCode.Unauthorized, ProblemJson(401))), JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => service.ExportTokensAsync());
+
+        Assert.Equal(401, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task ShareTokenAsync_ReturnsSentResponse()
+    {
+        var id = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var service = new TokenService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal($"/api/tokens/{id:D}/share", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"sent\":true}");
+        }), JsonOptions);
+
+        var result = await service.ShareTokenAsync(id, new ShareTokenRequest { RecipientEmail = "recipient@example.test" });
+
+        Assert.True(result.Sent);
+    }
+
+    [Fact]
+    public async Task ShareTokenAsync_NotFoundThrows404()
+    {
+        var service = new TokenService(CreateClient((_, _) => Json(HttpStatusCode.NotFound, ProblemJson(404))), JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            service.ShareTokenAsync(Guid.NewGuid(), new ShareTokenRequest { RecipientEmail = "recipient@example.test" }));
+
+        Assert.Equal(404, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetBillingSummaryAsync_ReturnsSummary()
+    {
+        var service = new BillingService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Equal("/api/billing/summary", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "{\"planId\":\"individual\",\"billingCycle\":\"monthly\",\"status\":\"active\",\"lastPayment\":null,\"transactions\":[],\"simulated\":true}");
+        }), JsonOptions);
+
+        var result = await service.GetSummaryAsync();
+
+        Assert.Equal("individual", result.PlanId);
+        Assert.Equal("monthly", result.BillingCycle);
+        Assert.Equal("active", result.Status);
+        Assert.Empty(result.Transactions);
+    }
+
+    [Fact]
+    public async Task GetBillingSummaryAsync_UnauthorizedThrows401()
+    {
+        var service = new BillingService(CreateClient((_, _) => Json(HttpStatusCode.Unauthorized, ProblemJson(401))), JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => service.GetSummaryAsync());
+
+        Assert.Equal(401, exception.StatusCode);
+    }
+
     private static HttpResponseMessage Json(HttpStatusCode statusCode, string content) => new(statusCode)
     {
         Content = new StringContent(content, Encoding.UTF8, "application/json")
     };
+
+    private static AuthService CreateAuthService(
+        Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> responder) =>
+        new(CreateClient(responder), new StubSessionManager(), JsonOptions);
+
+    private static HttpClient CreateClient(
+        Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> responder) =>
+        new(new StubHttpMessageHandler((request, cancellationToken) =>
+            Task.FromResult(responder(request, cancellationToken))))
+        {
+            BaseAddress = new Uri("https://api.mangoon.xyz/")
+        };
+
+    private static string ProblemJson(int statusCode) =>
+        $"{{\"title\":\"Request failed\",\"status\":{statusCode}}}";
 
     private sealed class StubHttpMessageHandler(
         Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responder) : HttpMessageHandler
