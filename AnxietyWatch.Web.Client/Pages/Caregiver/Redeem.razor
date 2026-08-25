@@ -1,0 +1,40 @@
+@page "/caregiver/redeem"
+@using System.ComponentModel.DataAnnotations
+@using AnxietyWatch.Web.Client.Models.Api
+@inject ICaregiverService CaregiverService
+@inject IAuthSessionManager SessionManager
+@inject NavigationManager Navigation
+
+<PageTitle>Vincular invitación | AnxietyWatch</PageTitle>
+<section class="auth-shell">
+    <div class="auth-card">
+        <header class="auth-heading"><h1>Vincular invitación</h1><p>Introduce el código que recibiste para comenzar.</p></header>
+        @if (!string.IsNullOrWhiteSpace(error)) { <div class="auth-alert auth-alert--error" role="alert">@error</div> }
+        <EditForm Model="model" OnValidSubmit="RedeemAsync" class="auth-form">
+            <DataAnnotationsValidator />
+            <div class="auth-field"><label for="caregiver-code">Código</label><InputText id="caregiver-code" class="form-input" @bind-Value="model.Code" autocomplete="one-time-code" /><ValidationMessage For="@(() => model.Code)" /></div>
+            <button class="auth-primary auth-primary--sage" type="submit" disabled="@busy">@(busy ? "Validando..." : "Continuar")</button>
+        </EditForm>
+        <p><a href="/login">Ya tengo una cuenta</a></p>
+    </div>
+</section>
+
+@code {
+    private readonly RedeemCaregiverCodeRequest model = new();
+    private bool busy;
+    private string? error;
+
+    private async Task RedeemAsync()
+    {
+        busy = true; error = null;
+        try
+        {
+            model.DeviceId = $"web-{Guid.NewGuid():N}";
+            await SessionManager.SetSessionAsync(await CaregiverService.RedeemCodeAsync(model));
+            Navigation.NavigateTo("/caregiver/activate");
+        }
+        catch (ApiException ex) { error = ApiErrorMessages.For(ex, "No pudimos validar el código."); }
+        catch (Exception) { error = "No pudimos conectar con el servicio. Inténtalo nuevamente."; }
+        finally { busy = false; }
+    }
+}
