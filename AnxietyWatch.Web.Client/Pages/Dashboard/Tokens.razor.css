@@ -807,27 +807,60 @@ code {
     background: #ad3232;
 }
 
+.token-modal-button--warning {
+    border: 1px solid #b86b2f;
+    background: #b86b2f;
+    color: #fff;
+}
+
+.token-modal-button--warning:hover:not(:disabled) {
+    background: #9d5722;
+}
+
+.token-modal-button--primary {
+    border: 1px solid var(--sage-500);
+    background: var(--sage-500);
+    color: #fff;
+}
+
+.token-modal-button--primary:hover:not(:disabled) {
+    background: var(--sage-700);
+}
+
 .token-modal-button:disabled {
     cursor: not-allowed;
     opacity: 0.58;
 }
 
-.token-delete-modal {
+.token-confirm-modal {
     width: min(100%, 430px);
 }
 
-.token-delete-modal__icon {
+.token-confirm-modal__icon {
     display: grid;
     width: 48px;
     height: 48px;
     place-items: center;
     margin-bottom: 1rem;
     border-radius: 50%;
+}
+
+.token-confirm-modal__icon--danger {
     background: #feecec;
     color: #c83f3f;
 }
 
-.token-delete-modal__icon svg {
+.token-confirm-modal__icon--warning {
+    background: #fff1e4;
+    color: #a55b24;
+}
+
+.token-confirm-modal__icon--primary {
+    background: var(--sage-100);
+    color: var(--sage-700);
+}
+
+.token-confirm-modal__icon svg {
     width: 24px;
     fill: none;
     stroke: currentColor;
@@ -836,13 +869,13 @@ code {
     stroke-width: 1.8;
 }
 
-.token-delete-modal h2 {
+.token-confirm-modal h2 {
     margin: 0;
     color: var(--ink);
     font-size: 1.15rem;
 }
 
-.token-delete-modal > p {
+.token-confirm-modal > p {
     margin: 0.65rem 0 0;
     color: #727d77;
     font-size: 0.75rem;

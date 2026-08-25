@@ -39,7 +39,6 @@
 .primary-action--secondary { border: 1px solid #bfd0c8; background: #fff; color: var(--sage-700); box-shadow: none; }
 .primary-action--secondary:hover { background: #edf4f1; }
 
-.state-panel,
 .chart-state {
     display: flex;
     min-height: 150px;
@@ -55,34 +54,12 @@
     text-align: center;
 }
 
-.state-panel--error,
 .chart-state--error { color: #9b4c4c; }
-.state-panel button,
 .chart-state button,
 .chart-state a { padding: 0.55rem 0.8rem; border: 1px solid #cbdad3; border-radius: 8px; background: #fff; color: var(--sage-700); cursor: pointer; font: inherit; font-weight: 750; text-decoration: none; }
-.state-panel button:disabled,
 .chart-state button:disabled { cursor: not-allowed; opacity: 0.55; }
 
-.kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
-.kpi-card { display: flex; min-width: 0; min-height: 215px; flex-direction: column; padding: 1.5rem; border: 1px solid rgba(224, 232, 228, 0.9); border-radius: 16px; background: #fff; box-shadow: 0 7px 22px rgba(55, 78, 69, 0.045); transition: transform 0.2s ease, box-shadow 0.2s ease; }
-.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 11px 28px rgba(55, 78, 69, 0.075); }
-.kpi-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; width: 100%; }
-.kpi-icon { display: grid; width: 46px; height: 46px; flex: 0 0 auto; place-items: center; border-radius: 14px; }
-.kpi-icon svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
-.kpi-icon--sage { background: #e6f0ec; color: #4f7b6f; }
-.kpi-icon--teal { background: #e2f1ef; color: #3f8078; }
-.kpi-icon--mint { background: #edf4ef; color: #668c77; }
-.kpi-icon--sand { background: #f3f0e5; color: #7c8063; }
-.kpi-trend { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; font-size: 1rem; font-weight: 800; }
-.kpi-trend--up { background: #fff0ec; color: #ad5a48; }
-.kpi-trend--down { background: #edf5f0; color: var(--sage-700); }
-.kpi-trend--stable { background: #f1f3f2; color: #7f8984; }
-.kpi-value { display: block; margin-top: 1.35rem; color: var(--ink); font-size: clamp(1.85rem, 3vw, 2.15rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.035em; }
-.kpi-meta { display: flex; flex-direction: column; gap: 0.25rem; margin-top: auto; padding-top: 1rem; }
-.kpi-meta strong { overflow: hidden; color: var(--ink); font-size: 0.82rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-.kpi-meta span { color: #919a96; font-size: 0.72rem; line-height: 1.35; }
-
-.history-card { margin-top: 1.25rem; padding: clamp(1.25rem, 3vw, 1.75rem); border: 1px solid rgba(224, 232, 228, 0.9); border-radius: 16px; background: #fff; box-shadow: 0 7px 22px rgba(55, 78, 69, 0.045); }
+.history-card { padding: clamp(1.25rem, 3vw, 1.75rem); border: 1px solid rgba(224, 232, 228, 0.9); border-radius: 16px; background: #fff; box-shadow: 0 7px 22px rgba(55, 78, 69, 0.045); }
 .history-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .history-header h2 { margin: 0; color: var(--ink); font-size: 1.08rem; letter-spacing: -0.015em; }
 .history-header p { margin: 0.4rem 0 0; color: var(--muted); font-size: 0.78rem; }
@@ -106,21 +83,16 @@
 
 .primary-action:focus-visible,
 .range-selector button:focus-visible,
-.state-panel button:focus-visible,
 .chart-state button:focus-visible,
 .chart-state a:focus-visible { outline: 3px solid rgba(94, 139, 126, 0.25); outline-offset: 2px; }
 
-@media (max-width: 1120px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) {
     .page-header { align-items: stretch; flex-direction: column; margin-bottom: 1.35rem; }
     .primary-action { justify-content: center; }
-    .kpi-grid { grid-template-columns: 1fr; }
     .history-header { flex-direction: column; }
     .range-selector { width: 100%; }
     .range-selector button { flex: 1; }
     .history-chart { margin-top: 1.5rem; }
     .y-axis { height: 220px; }
     .chart-plot { grid-template-rows: 220px auto; }
-    .state-panel { flex-direction: column; }
 }
-@media (prefers-reduced-motion: reduce) { .kpi-card { transition: none; } .kpi-card:hover { transform: none; } }

@@ -97,13 +97,13 @@
                                                 <button type="button" aria-label="Copiar token" title="Copiar" @onclick="() => CopyTokenAsync(token.Code)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg></button>
                                                 @if (CanRotate(token))
                                                 {
-                                                    <button type="button" aria-label="Regenerar token" title="Regenerar" @onclick="() => RotateTokenAsync(token)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m9.5-3A7 7 0 0 0 6 7m-.5 8A7 7 0 0 0 18 17" /></svg></button>
+                                                    <button type="button" aria-label="Regenerar token" title="Regenerar" @onclick="() => OpenConfirmationModal(token, TokenConfirmAction.Rotate)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m9.5-3A7 7 0 0 0 6 7m-.5 8A7 7 0 0 0 18 17" /></svg></button>
                                                 }
                                                 @if (HasStatus(token, "accepted"))
                                                 {
-                                                    <button type="button" aria-label="Revocar token" title="Revocar" @onclick="() => RevokeTokenAsync(token)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 14.5 5-5M7 17l-1.5 1.5a3.5 3.5 0 0 1-5-5L5 9a3.5 3.5 0 0 1 5 0m7 6a3.5 3.5 0 0 0 5 0l1.5-1.5a3.5 3.5 0 0 0-5-5L14 13a3.5 3.5 0 0 0 0 5" /></svg></button>
+                                                    <button type="button" aria-label="Revocar token" title="Revocar" @onclick="() => OpenConfirmationModal(token, TokenConfirmAction.Revoke)" disabled="@mutationInProgress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 14.5 5-5M7 17l-1.5 1.5a3.5 3.5 0 0 1-5-5L5 9a3.5 3.5 0 0 1 5 0m7 6a3.5 3.5 0 0 0 5 0l1.5-1.5a3.5 3.5 0 0 0-5-5L14 13a3.5 3.5 0 0 0 0 5" /></svg></button>
                                                 }
-                                                <button type="button" aria-label="Eliminar token" title="@(CanDelete(token) ? "Eliminar" : "Solo los tokens pendientes pueden eliminarse")" @onclick="() => OpenDeleteModal(token)" disabled="@(mutationInProgress || !CanDelete(token))"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-10 4v5m4-5v5M8 7l1-3h6l1 3m2 0-1 13H7L6 7" /></svg></button>
+                                                <button type="button" aria-label="Eliminar token" title="@(CanDelete(token) ? "Eliminar" : "Solo los tokens pendientes pueden eliminarse")" @onclick="() => OpenConfirmationModal(token, TokenConfirmAction.Delete)" disabled="@(mutationInProgress || !CanDelete(token))"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-10 4v5m4-5v5M8 7l1-3h6l1 3m2 0-1 13H7L6 7" /></svg></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -176,18 +176,29 @@
         </div>
     }
 
-    @if (tokenPendingDeletion is not null)
+    @if (pendingConfirmation is not null)
     {
-        <div class="token-modal-overlay" role="presentation" @onclick="CloseDeleteModal">
-            <section class="token-modal token-delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-token-title" @onclick:stopPropagation="true">
-                <span class="token-delete-modal__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24"><path d="M4 7h16m-10 4v5m4-5v5M8 7l1-3h6l1 3m2 0-1 13H7L6 7" /></svg>
+        <div class="token-modal-overlay" role="presentation" @onclick="CloseConfirmationModal">
+            <section class="token-modal token-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="token-confirm-title" @onclick:stopPropagation="true">
+                <span class="token-confirm-modal__icon @GetConfirmationIconClass()" aria-hidden="true">
+                    @if (pendingConfirmation.Action == TokenConfirmAction.Delete)
+                    {
+                        <svg viewBox="0 0 24 24"><path d="M4 7h16m-10 4v5m4-5v5M8 7l1-3h6l1 3m2 0-1 13H7L6 7" /></svg>
+                    }
+                    else if (pendingConfirmation.Action == TokenConfirmAction.Revoke)
+                    {
+                        <svg viewBox="0 0 24 24"><path d="m9.5 14.5 5-5M7 17l-1.5 1.5a3.5 3.5 0 0 1-5-5L5 9a3.5 3.5 0 0 1 5 0m7 6a3.5 3.5 0 0 0 5 0l1.5-1.5a3.5 3.5 0 0 0-5-5L14 13a3.5 3.5 0 0 0 0 5" /></svg>
+                    }
+                    else
+                    {
+                        <svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5m9.5-3A7 7 0 0 0 6 7m-.5 8A7 7 0 0 0 18 17" /></svg>
+                    }
                 </span>
-                <h2 id="delete-token-title">¿Eliminar este token?</h2>
-                <p>Esta acción no se puede deshacer. El código dejará de poder usarse para vincularse.</p>
+                <h2 id="token-confirm-title">@GetConfirmationTitle()</h2>
+                <p>@GetConfirmationText()</p>
                 <footer class="token-modal__actions">
-                    <button class="token-modal-button token-modal-button--cancel" type="button" @onclick="CloseDeleteModal" disabled="@isDeleting">Cancelar</button>
-                    <button class="token-modal-button token-modal-button--danger" type="button" @onclick="ConfirmDeleteTokenAsync" disabled="@isDeleting">@(isDeleting ? "Eliminando..." : "Eliminar")</button>
+                    <button class="token-modal-button token-modal-button--cancel" type="button" @onclick="CloseConfirmationModal" disabled="@confirmationInProgress">Cancelar</button>
+                    <button class="token-modal-button @GetConfirmationButtonClass()" type="button" @onclick="ConfirmPendingActionAsync" disabled="@confirmationInProgress">@GetConfirmationButtonText()</button>
                 </footer>
             </section>
         </div>
@@ -217,7 +228,7 @@
     private bool pageMessageIsError;
     private string? modalMessage;
     private LinkTokenDto? generatedToken;
-    private LinkTokenDto? tokenPendingDeletion;
+    private PendingTokenConfirmation? pendingConfirmation;
 
     private int pendingTokenCount => allTokens.Count(token => HasStatus(token, "pending") && !IsVisuallyExpired(token));
     private int expiredTokenCount => allTokens.Count(IsExpired);
@@ -225,6 +236,13 @@
     private int usagePercent => planLimit == 0 ? 0 : Math.Min(100, (int)Math.Round(quotaTokenCount * 100d / planLimit));
     private bool isLimitReached => quotaTokenCount >= planLimit;
     private bool mutationInProgress => isCreating || isDeleting || isRevoking || isRotating || isExporting;
+    private bool confirmationInProgress => pendingConfirmation?.Action switch
+    {
+        TokenConfirmAction.Delete => isDeleting,
+        TokenConfirmAction.Revoke => isRevoking,
+        TokenConfirmAction.Rotate => isRotating,
+        _ => false
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -318,28 +336,46 @@
         finally { isDeleting = false; }
     }
 
-    private void OpenDeleteModal(LinkTokenDto token)
+    private void OpenConfirmationModal(LinkTokenDto token, TokenConfirmAction action)
     {
-        if (!CanDelete(token) || mutationInProgress) return;
+        var isAllowed = action switch
+        {
+            TokenConfirmAction.Delete => CanDelete(token),
+            TokenConfirmAction.Revoke => HasStatus(token, "accepted"),
+            TokenConfirmAction.Rotate => CanRotate(token),
+            _ => false
+        };
+        if (!isAllowed || mutationInProgress) return;
 
         SetPageMessage(null, false);
-        tokenPendingDeletion = token;
+        pendingConfirmation = new PendingTokenConfirmation(token, action);
     }
 
-    private void CloseDeleteModal()
+    private void CloseConfirmationModal()
     {
-        if (isDeleting) return;
+        if (confirmationInProgress) return;
 
-        tokenPendingDeletion = null;
+        pendingConfirmation = null;
         SetPageMessage(null, false);
     }
 
-    private async Task ConfirmDeleteTokenAsync()
+    private async Task ConfirmPendingActionAsync()
     {
-        if (tokenPendingDeletion is not { } token || isDeleting) return;
+        if (pendingConfirmation is not { } confirmation || confirmationInProgress) return;
 
-        await DeleteTokenAsync(token);
-        tokenPendingDeletion = null;
+        switch (confirmation.Action)
+        {
+            case TokenConfirmAction.Delete:
+                await DeleteTokenAsync(confirmation.Token);
+                break;
+            case TokenConfirmAction.Revoke:
+                await RevokeTokenAsync(confirmation.Token);
+                break;
+            case TokenConfirmAction.Rotate:
+                await RotateTokenAsync(confirmation.Token);
+                break;
+        }
+        pendingConfirmation = null;
     }
 
     private async Task RevokeTokenAsync(LinkTokenDto token)
@@ -349,9 +385,6 @@
             if (!Guid.TryParse(token.Id, out _)) SetPageMessage("El identificador del token no es válido.", true);
             return;
         }
-
-        var confirmed = await JS.InvokeAsync<bool>("confirm", "¿Revocar este token? El dispositivo vinculado dejará de enviar datos al plan.");
-        if (!confirmed) return;
 
         isRevoking = true;
         SetPageMessage(null, false);
@@ -379,9 +412,6 @@
             if (!Guid.TryParse(token.Id, out _)) SetPageMessage("El identificador del token no es válido.", true);
             return;
         }
-
-        var confirmed = await JS.InvokeAsync<bool>("confirm", "¿Regenerar este token? El código actual dejará de funcionar de inmediato.");
-        if (!confirmed) return;
 
         isRotating = true;
         SetPageMessage(null, false);
@@ -492,6 +522,41 @@
     }
 
     private void SetPageMessage(string? message, bool isError) => (pageMessage, pageMessageIsError) = (message, isError);
+    private string GetConfirmationTitle() => pendingConfirmation?.Action switch
+    {
+        TokenConfirmAction.Delete => "¿Eliminar este token?",
+        TokenConfirmAction.Revoke => "¿Revocar este token?",
+        TokenConfirmAction.Rotate => "¿Regenerar este token?",
+        _ => string.Empty
+    };
+    private string GetConfirmationText() => pendingConfirmation?.Action switch
+    {
+        TokenConfirmAction.Delete => "Esta acción no se puede deshacer. El código dejará de poder usarse para vincularse.",
+        TokenConfirmAction.Revoke => "El dispositivo vinculado dejará de enviar datos al plan.",
+        TokenConfirmAction.Rotate => "El código actual dejará de funcionar de inmediato.",
+        _ => string.Empty
+    };
+    private string GetConfirmationIconClass() => pendingConfirmation?.Action switch
+    {
+        TokenConfirmAction.Delete => "token-confirm-modal__icon--danger",
+        TokenConfirmAction.Revoke => "token-confirm-modal__icon--warning",
+        TokenConfirmAction.Rotate => "token-confirm-modal__icon--primary",
+        _ => string.Empty
+    };
+    private string GetConfirmationButtonClass() => pendingConfirmation?.Action switch
+    {
+        TokenConfirmAction.Delete => "token-modal-button--danger",
+        TokenConfirmAction.Revoke => "token-modal-button--warning",
+        TokenConfirmAction.Rotate => "token-modal-button--primary",
+        _ => string.Empty
+    };
+    private string GetConfirmationButtonText() => pendingConfirmation?.Action switch
+    {
+        TokenConfirmAction.Delete => isDeleting ? "Eliminando..." : "Eliminar",
+        TokenConfirmAction.Revoke => isRevoking ? "Revocando..." : "Revocar",
+        TokenConfirmAction.Rotate => isRotating ? "Regenerando..." : "Regenerar",
+        _ => "Confirmar"
+    };
     private string GetTokenTypeClass(string role) => selectedRole == role ? "token-type-option is-selected" : "token-type-option";
     private (string Role, string Label, string Description)[] GetTokenRoles() =>
         SessionManager.CurrentUser?.PlanId?.ToLowerInvariant() switch
@@ -550,4 +615,13 @@
     private static string GetStatusClass(LinkTokenDto token) => IsVisuallyExpired(token)
         ? "status-badge--expired"
         : token.Status.ToLowerInvariant() switch { "accepted" => "status-badge--used", "pending" => "status-badge--pending", "expired" => "status-badge--expired", _ => "status-badge--available" };
+
+    private enum TokenConfirmAction
+    {
+        Delete,
+        Revoke,
+        Rotate
+    }
+
+    private sealed record PendingTokenConfirmation(LinkTokenDto Token, TokenConfirmAction Action);
 }
