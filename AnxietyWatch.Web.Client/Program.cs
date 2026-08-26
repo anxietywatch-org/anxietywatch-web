@@ -43,7 +43,6 @@ builder.Services.AddScoped<IEpisodeService, EpisodeService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<ISupportService, SupportService>();
-builder.Services.AddScoped<ICaregiverService, CaregiverService>();
 
 var host = builder.Build();
 await host.RunAsync();
