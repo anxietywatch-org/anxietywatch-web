@@ -383,6 +383,35 @@ public sealed class ServiceTests
         Assert.Equal(401, exception.StatusCode);
     }
 
+    [Fact]
+    public async Task GetEventsAsync_ReturnsAlertEvents()
+    {
+        var service = new EventService(CreateClient((request, _) =>
+        {
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Equal("/api/events?limit=50", request.RequestUri!.PathAndQuery);
+            return Json(HttpStatusCode.OK, "[{\"eventId\":\"event-1\",\"type\":\"SOS\",\"occurredAt\":\"2026-08-25T08:30:00Z\",\"status\":\"TRIGGERED\"}]");
+        }), JsonOptions);
+
+        var result = await service.GetEventsAsync();
+
+        var alertEvent = Assert.Single(result);
+        Assert.Equal("event-1", alertEvent.EventId);
+        Assert.Equal("SOS", alertEvent.Type);
+        Assert.Equal("TRIGGERED", alertEvent.Status);
+        Assert.Equal(DateTimeOffset.Parse("2026-08-25T08:30:00Z"), alertEvent.OccurredAt);
+    }
+
+    [Fact]
+    public async Task GetEventsAsync_UnauthorizedThrows401()
+    {
+        var service = new EventService(CreateClient((_, _) => Json(HttpStatusCode.Unauthorized, ProblemJson(401))), JsonOptions);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => service.GetEventsAsync());
+
+        Assert.Equal(401, exception.StatusCode);
+    }
+
     private static HttpResponseMessage Json(HttpStatusCode statusCode, string content) => new(statusCode)
     {
         Content = new StringContent(content, Encoding.UTF8, "application/json")

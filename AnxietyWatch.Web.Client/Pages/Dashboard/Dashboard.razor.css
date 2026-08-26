@@ -74,10 +74,10 @@
 .y-axis { display: flex; height: 290px; flex-direction: column; justify-content: space-between; padding-bottom: 2.3rem; color: #a0a9a5; font-size: 0.65rem; text-align: right; }
 .chart-scroll { min-width: 0; overflow-x: auto; }
 .chart-plot { display: grid; grid-template-rows: 290px auto; min-width: max(100%, calc(var(--point-count) * 34px)); }
-.chart-bars { display: grid; grid-template-columns: repeat(var(--point-count), minmax(28px, 1fr)); align-items: end; border-bottom: 1px solid #e5ebe8; background-image: linear-gradient(to bottom, #e9eeec 1px, transparent 1px); background-size: 100% 25%; }
-.chart-column { display: flex; height: 100%; align-items: center; justify-content: flex-end; flex-direction: column; gap: 0.25rem; padding-inline: 18%; }
-.chart-bar { width: 100%; min-height: 3px; border-radius: 6px 6px 2px 2px; background: linear-gradient(180deg, #7eaa9d, #4f7b6f); box-shadow: 0 4px 10px rgba(63, 111, 98, 0.14); }
-.chart-value { color: #66736d; font-size: 0.58rem; font-weight: 800; }
+.alert-line-chart { width: 100%; height: 290px; overflow: visible; border-bottom: 1px solid #e5ebe8; background-image: linear-gradient(to bottom, #e9eeec 1px, transparent 1px); background-size: 100% 25%; }
+.alert-line { fill: none; stroke: #4f7b6f; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.alert-point { fill: #7eaa9d; stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; transition: fill 0.16s ease, r 0.16s ease; }
+.alert-point:hover { r: 2.2; fill: #3f6f62; }
 .x-axis { display: grid; grid-template-columns: repeat(var(--point-count), minmax(28px, 1fr)); padding-top: 0.8rem; color: #89938f; font-size: 0.62rem; font-weight: 650; text-align: center; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; margin: -1px; padding: 0; border: 0; clip: rect(0 0 0 0); white-space: nowrap; }
 
@@ -95,4 +95,9 @@
     .history-chart { margin-top: 1.5rem; }
     .y-axis { height: 220px; }
     .chart-plot { grid-template-rows: 220px auto; }
+    .alert-line-chart { height: 220px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .alert-point { transition: none; }
 }
