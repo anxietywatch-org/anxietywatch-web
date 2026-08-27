@@ -2,7 +2,7 @@
 @layout DashboardLayout
 @using System.Globalization
 @using AnxietyWatch.Web.Client.Models.Api
-@inject IEpisodeService EpisodeService
+@inject IEventService EventService
 @inject IAuthSessionManager SessionManager
 @inject NavigationManager Navigation
 
@@ -23,8 +23,8 @@
     <section class="history-card" aria-labelledby="history-title">
         <header class="history-header">
             <div>
-                <h2 id="history-title">Historial de ansiedad</h2>
-                <p>Consulta la evolución de tus últimos registros.</p>
+                <h2 id="history-title">Alertas por día</h2>
+                <p>Consulta cuántas alertas del paciente ocurrieron cada día.</p>
             </div>
             <div class="range-selector" aria-label="Periodo del historial">
                 @foreach (var range in Ranges)
@@ -32,53 +32,59 @@
                     <button type="button"
                             class="@(selectedRange == range ? "is-active" : null)"
                             aria-pressed="@(selectedRange == range)"
-                            disabled="@isEpisodesLoading"
+                            disabled="@isChartLoading"
                             @onclick="() => ChangeRangeAsync(range)">@range días</button>
                 }
             </div>
         </header>
 
-        @if (isEpisodesLoading)
+        @if (isChartLoading)
         {
-            <div class="chart-state" role="status">Cargando episodios...</div>
+            <div class="chart-state" role="status">Cargando alertas...</div>
         }
-        else if (!string.IsNullOrEmpty(episodesError))
+        else if (!string.IsNullOrEmpty(chartError))
         {
             <div class="chart-state chart-state--error" role="alert">
-                <span>@episodesError</span>
-                <button type="button" disabled="@isEpisodesLoading" @onclick="LoadEpisodesAsync">Reintentar</button>
+                <span>@chartError</span>
+                <button type="button" disabled="@isChartLoading" @onclick="LoadAlertPointsAsync">Reintentar</button>
             </div>
         }
-        else if (episodes.Count == 0)
+        else if (!HasEventsInSelectedRange)
         {
             <div class="chart-state">
-                <strong>Aún no hay episodios en este periodo.</strong>
+                <strong>Aún no hay alertas en este periodo.</strong>
                 <span>@(HasWearableIntegration
-                    ? "Los datos del dispositivo aparecerán aquí cuando estén disponibles."
-                    : "Aquí verás tu evolución en cuanto haya registros.")</span>
+                    ? "Las alertas del dispositivo aparecerán aquí cuando estén disponibles."
+                    : "Aquí verás la evolución en cuanto haya alertas.")</span>
             </div>
         }
         else
         {
             <figure class="history-chart" aria-labelledby="history-title">
-                <figcaption class="visually-hidden">Intensidad de @episodes.Count episodios durante los últimos @selectedRange días.</figcaption>
+                <figcaption class="visually-hidden">Cantidad diaria de alertas durante los últimos @selectedRange días.</figcaption>
                 <div class="chart-layout">
-                    <div class="y-axis" aria-hidden="true"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
+                    <div class="y-axis" aria-hidden="true">
+                        @foreach (var value in YAxisValues)
+                        {
+                            <span>@FormatYAxisValue(value)</span>
+                        }
+                    </div>
                     <div class="chart-scroll">
-                        <div class="chart-plot" style="--point-count: @Math.Max(episodes.Count, 7)">
-                            <div class="chart-bars">
-                                @foreach (var episode in episodes)
+                        <div class="chart-plot" style="--point-count: @Math.Max(dailyAlertPoints.Count, 7)">
+                            <svg class="alert-line-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Línea de cantidad diaria de alertas">
+                                <polyline class="alert-line" points="@AlertPolylinePoints" />
+                                @for (var index = 0; index < dailyAlertPoints.Count; index++)
                                 {
-                                    <div class="chart-column" title="@EpisodeTitle(episode)" @key="episode.Id">
-                                        <span class="chart-value">@episode.Intensity</span>
-                                        <span class="chart-bar" style="height: @Math.Clamp(episode.Intensity, 0, 100)%"></span>
-                                    </div>
+                                    var point = dailyAlertPoints[index];
+                                    <circle class="alert-point" cx="@GetPointX(index)" cy="@GetPointY(point)" r="1.7" @key="point.Date">
+                                        <title>@DailyAlertPointTitle(point)</title>
+                                    </circle>
                                 }
-                            </div>
+                            </svg>
                             <div class="x-axis" aria-hidden="true">
-                                @foreach (var episode in episodes)
+                                @foreach (var point in dailyAlertPoints)
                                 {
-                                    <span>@episode.Date.ToLocalTime().ToString("dd/MM")</span>
+                                    <span>@point.Date.ToString("dd/MM")</span>
                                 }
                             </div>
                         </div>
@@ -92,12 +98,13 @@
 @code {
     private static readonly CultureInfo SpanishCulture = CultureInfo.GetCultureInfo("es-ES");
     private static readonly int[] Ranges = [7, 30, 90];
-    private IReadOnlyList<EpisodeDto> episodes = [];
+    private IReadOnlyList<AlertPointDto> allAlertEvents = [];
+    private IReadOnlyList<DailyAlertPoint> dailyAlertPoints = [];
     private string? userName;
     private string? planId;
-    private string? episodesError;
+    private string? chartError;
     private int selectedRange = 7;
-    private bool isEpisodesLoading = true;
+    private bool isChartLoading = true;
     private bool isRedirecting;
 
     private string CurrentDate => DateTime.Now.ToString("dddd, d 'de' MMMM 'de' yyyy", SpanishCulture);
@@ -112,13 +119,18 @@
     };
     private bool HasWearableIntegration => planId?.Trim().ToLowerInvariant() is
         "individual" or "family" or "familiar" or "professional" or "profesional";
+    private bool HasEventsInSelectedRange => dailyAlertPoints.Any(point => point.Count > 0);
+    private int ChartMaximum => Math.Max(1, dailyAlertPoints.Max(point => point.Count));
+    private double[] YAxisValues => [ChartMaximum, ChartMaximum * 0.75, ChartMaximum * 0.5, ChartMaximum * 0.25, 0];
+    private string AlertPolylinePoints => string.Join(" ", dailyAlertPoints.Select((point, index) =>
+        $"{GetPointX(index)},{GetPointY(point)}"));
 
     protected override async Task OnInitializedAsync()
     {
         LoadSession();
         if (!isRedirecting)
         {
-            await LoadEpisodesAsync();
+            await LoadAlertPointsAsync();
         }
     }
 
@@ -136,34 +148,60 @@
         planId = user.PlanId;
     }
 
-    private async Task LoadEpisodesAsync()
+    private async Task LoadAlertPointsAsync()
     {
-        isEpisodesLoading = true;
-        episodesError = null;
+        isChartLoading = true;
+        chartError = null;
         try
         {
-            episodes = (await EpisodeService.GetEpisodesAsync(selectedRange)).OrderBy(episode => episode.Date).ToArray();
+            allAlertEvents = (await EventService.GetEventsAsync(50)).OrderBy(point => point.OccurredAt).ToArray();
+            BuildDailyAlertPoints();
         }
         catch (ApiException exception)
         {
             if (exception.StatusCode == 401) await RedirectToLoginAsync();
-            else episodesError = ApiErrorMessages.For(exception, "No pudimos cargar tus episodios.");
+            else chartError = ApiErrorMessages.For(exception, "No pudimos cargar el historial de alertas.");
         }
         catch
         {
-            episodesError = "No pudimos cargar tus episodios. Inténtalo nuevamente.";
+            chartError = "No pudimos cargar el historial de alertas. Inténtalo nuevamente.";
         }
         finally
         {
-            isEpisodesLoading = false;
+            isChartLoading = false;
         }
     }
 
-    private async Task ChangeRangeAsync(int range)
+    private Task ChangeRangeAsync(int range)
     {
-        if (range == selectedRange || isEpisodesLoading) return;
+        if (range == selectedRange || isChartLoading) return Task.CompletedTask;
         selectedRange = range;
-        await LoadEpisodesAsync();
+        BuildDailyAlertPoints();
+        return Task.CompletedTask;
+    }
+
+    private void BuildDailyAlertPoints()
+    {
+        var lastDate = DateOnly.FromDateTime(DateTime.Now);
+        var firstDate = lastDate.AddDays(-(selectedRange - 1));
+        var eventsByDate = allAlertEvents
+            .Select(alertEvent => new
+            {
+                Event = alertEvent,
+                Date = DateOnly.FromDateTime(alertEvent.OccurredAt.ToLocalTime().DateTime)
+            })
+            .Where(item => item.Date >= firstDate && item.Date <= lastDate)
+            .GroupBy(item => item.Date)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.Event).ToArray());
+
+        dailyAlertPoints = Enumerable.Range(0, selectedRange)
+            .Select(offset =>
+            {
+                var date = firstDate.AddDays(offset);
+                var events = eventsByDate.GetValueOrDefault(date, []);
+                return new DailyAlertPoint(date, events.Length, GetAlertBreakdown(events));
+            })
+            .ToArray();
     }
 
     private async Task RedirectToLoginAsync()
@@ -174,6 +212,40 @@
         Navigation.NavigateTo("/login", replace: true);
     }
 
-    private static string EpisodeTitle(EpisodeDto episode) =>
-        $"{episode.Date.ToLocalTime().ToString("g", SpanishCulture)}: intensidad {episode.Intensity}";
+    private string GetPointX(int index)
+    {
+        var value = dailyAlertPoints.Count <= 1 ? 50d : index * 100d / (dailyAlertPoints.Count - 1);
+        return value.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private string GetPointY(DailyAlertPoint point)
+    {
+        var value = 100 - point.Count * 100d / ChartMaximum;
+        return value.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private static string GetAlertBreakdown(IReadOnlyList<AlertPointDto> events) => string.Join(", ", events
+        .GroupBy(GetAlertCategory)
+        .OrderBy(group => group.Key)
+        .Select(group => $"{group.Count()} {group.Key}"));
+
+    private static string GetAlertCategory(AlertPointDto alertEvent)
+    {
+        if (alertEvent.Type.Equals("SOS", StringComparison.OrdinalIgnoreCase)) return "SOS";
+        if (alertEvent.Status.Equals("SUPPORT_REQUESTED", StringComparison.OrdinalIgnoreCase)) return "apoyo solicitado";
+        return alertEvent.Type.Replace('_', ' ').ToLowerInvariant();
+    }
+
+    private static string FormatYAxisValue(double value) =>
+        value.ToString(value % 1 == 0 ? "0" : "0.##", CultureInfo.InvariantCulture);
+
+    private static string DailyAlertPointTitle(DailyAlertPoint point)
+    {
+        var countLabel = point.Count == 1 ? "1 evento" : $"{point.Count} eventos";
+        return string.IsNullOrEmpty(point.Breakdown)
+            ? $"{point.Date.ToString("d 'de' MMMM", SpanishCulture)}: {countLabel}"
+            : $"{point.Date.ToString("d 'de' MMMM", SpanishCulture)}: {countLabel} ({point.Breakdown})";
+    }
+
+    private sealed record DailyAlertPoint(DateOnly Date, int Count, string Breakdown);
 }

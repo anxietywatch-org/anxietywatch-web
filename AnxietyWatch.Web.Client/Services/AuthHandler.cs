@@ -12,6 +12,7 @@ public class AuthHandler : DelegatingHandler
     [
         "api/dashboard",
         "api/episodes",
+        "api/events",
         "api/tokens",
         "api/profile",
         "api/settings",
